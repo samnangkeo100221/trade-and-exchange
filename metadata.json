@@ -1,0 +1,6 @@
+{
+  "name": "Cambodia Market & Gold Pulse (តាមដានតម្លៃមាស អត្រាប្ដូរប្រាក់ ប្រេង និង ICT)",
+  "description": "កម្មវិធីតាមដានតម្លៃមាសអន្តរជាតិនិងកម្ពុជា (គិតជាអោន និង តម្លឹង) អត្រាប្ដូរប្រាក់ USD/KHR/CNY តម្លៃប្រេងឥន្ធនៈ វិភាគបច្ចេកទេស ICT និងផ្ញើសារ Telegram",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
