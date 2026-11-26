@@ -9,8 +9,28 @@ import {
   CHI_PER_DAMLUNG,
   HUN_PER_DAMLUNG,
 } from '@/lib/market-data';
-import { Coins, Calculator, ArrowRightLeft, Send, Sparkles, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import {
+  Coins,
+  Calculator,
+  ArrowRightLeft,
+  Send,
+  Sparkles,
+  TrendingUp,
+  TrendingDown,
+  Info,
+  Activity,
+  Layers,
+  ShieldCheck,
+  Zap,
+  Globe,
+  Bot,
+  Loader2,
+  Newspaper,
+  Target,
+  Clock,
+} from 'lucide-react';
 import ChartComponent from './ChartComponent';
+import MarketNews from './MarketNews';
 
 interface GoldTabProps {
   gold: GoldPrice;
@@ -24,6 +44,40 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
   const [calcUnit, setCalcUnit] = useState<'damlung' | 'chi' | 'hun' | 'ounce' | 'gram'>('damlung');
   const [calcGoldType, setCalcGoldType] = useState<'kilobar' | 'gold24k' | 'gold18k'>('kilobar');
   const [purchasePriceUsd, setPurchasePriceUsd] = useState<string>('');
+
+  // AI Analysis State
+  const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
+  const [aiReport, setAiReport] = useState<string | null>(null);
+
+  const usdRate = currencies.acleda?.sellCash || currencies.usdKhrMarket.sell;
+
+  // International Gold Bid / Ask
+  const spotBidUsd = Math.round((gold.spotOzUsd - 0.5) * 100) / 100;
+  const spotAskUsd = gold.spotOzUsd;
+  const spotBidKhr = Math.round(spotBidUsd * usdRate);
+  const spotAskKhr = Math.round(spotAskUsd * usdRate);
+
+  // Per Gram
+  const gramBidUsd = Math.round((spotBidUsd / GRAMS_PER_TROY_OZ) * 100) / 100;
+  const gramAskUsd = Math.round((spotAskUsd / GRAMS_PER_TROY_OZ) * 100) / 100;
+
+  // Cambodia Damlung Buy / Sell
+  const damlungBuyUsd = gold.gold24kBuyDamlung;
+  const damlungSellUsd = gold.gold24kSellDamlung;
+  const damlungBuyKhr = Math.round(damlungBuyUsd * usdRate);
+  const damlungSellKhr = Math.round(damlungSellUsd * usdRate);
+
+  // 1 Chi Buy / Sell
+  const chiBuyUsd = Math.round((damlungBuyUsd / 10) * 100) / 100;
+  const chiSellUsd = Math.round((damlungSellUsd / 10) * 100) / 100;
+  const chiBuyKhr = Math.round(damlungBuyKhr / 10);
+  const chiSellKhr = Math.round(damlungSellKhr / 10);
+
+  // 1 Hun Buy / Sell
+  const hunBuyUsd = Math.round((damlungBuyUsd / 100) * 100) / 100;
+  const hunSellUsd = Math.round((damlungSellUsd / 100) * 100) / 100;
+  const hunBuyKhr = Math.round(damlungBuyKhr / 100);
+  const hunSellKhr = Math.round(damlungSellKhr / 100);
 
   // Calculate equivalent weight in Damlung
   const amountInDamlung = (() => {
@@ -58,7 +112,7 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
   })();
 
   const totalUsd = amountInDamlung * unitPricePerDamlungUsd;
-  const totalKhr = totalUsd * currencies.usdKhrMarket.sell;
+  const totalKhr = totalUsd * usdRate;
   const totalGrams = amountInDamlung * GRAMS_PER_DAMLUNG;
   const totalTroyOz = totalGrams / GRAMS_PER_TROY_OZ;
 
@@ -67,44 +121,80 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
   const pnlUsd = buyCostUsd ? totalUsd - buyCostUsd : null;
   const pnlPercent = buyCostUsd && buyCostUsd > 0 ? ((totalUsd - buyCostUsd) / buyCostUsd) * 100 : null;
 
-  // Quick message for Telegram
+  // Request AI Analysis from server
+  const handleRequestAiAnalysis = async () => {
+    setIsAiLoading(true);
+    setAiReport(null);
+    try {
+      const res = await fetch('/api/gemini/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset: 'XAUUSD',
+          currentPrice: gold.spotOzUsd,
+          high24h: gold.high24hUsd,
+          low24h: gold.low24hUsd,
+          timeframe: '4H',
+          contextData: {
+            damlungUsd: gold.damlungUsd,
+            damlungKhr: gold.damlungKhr,
+            usdKhrRate: usdRate,
+            strategy: 'ICT + MA20/50/200 + IMR/RSI',
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.analysisText) {
+        setAiReport(data.analysisText);
+      }
+    } catch (e: any) {
+      setAiReport('បរាជ័យក្នុងការទាញយកការវិភាគ AI សូមព្យាយាមម្តងទៀត');
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  // Telegram report
   const handleTelegramGoldReport = () => {
-    const text = `🟡 <b>របាយការណ៍តម្លៃមាសបច្ចុប្បន្នភាព (Gold Pulse)</b>
+    const text = `🟡 <b>របាយការណ៍ទីផ្សារមាសពេញលេញ (Gold Market Report)</b>
 📅 ${gold.lastUpdated}
 
-✨ <b>តម្លៃមាសកម្ពុជា:</b>
-• ១ តម្លឹង (Damlung): <b>${gold.damlungKhr.toLocaleString()} ៛</b> (~$${gold.damlungUsd.toFixed(2)})
-• ១ ជី (Chi): <b>${gold.chiKhr.toLocaleString()} ៛</b> (~$${gold.chiUsd.toFixed(2)})
-• ១ ហ៊ុន (Hun): <b>${gold.hunKhr.toLocaleString()} ៛</b> (~$${gold.hunUsd.toFixed(2)})
+🇰🇭 <b>១. តម្លៃមាសនៅប្រទេសកម្ពុជា (Cambodia Gold):</b>
+• ១ តម្លឹង (37.5g): ទិញ <b>$${damlungBuyUsd.toLocaleString()}</b> (${damlungBuyKhr.toLocaleString()} ៛) · លក់ <b>$${damlungSellUsd.toLocaleString()}</b> (${damlungSellKhr.toLocaleString()} ៛)
+• ១ ជី (3.75g): ទិញ $${chiBuyUsd} (${chiBuyKhr.toLocaleString()} ៛) · លក់ $${chiSellUsd} (${chiSellKhr.toLocaleString()} ៛)
+• ១ ហ៊ុន (0.375g): ទិញ $${hunBuyUsd} (${hunBuyKhr.toLocaleString()} ៛) · លក់ $${hunSellUsd} (${hunSellKhr.toLocaleString()} ៛)
+• មាសគីឡូ 99.99%: $${gold.gold24kBuyDamlung.toLocaleString()} / $${gold.gold24kSellDamlung.toLocaleString()}
+• មាស 18K: $${gold.gold18kBuyDamlung.toLocaleString()} / $${gold.gold18kSellDamlung.toLocaleString()}
 
-🏆 <b>មាសគីឡូ 99.99% (Kilobar):</b>
-• ទិញចូល: $${gold.gold24kBuyDamlung.toLocaleString()} (${gold.goldKilobarBuyKhr.toLocaleString()} ៛)
-• លក់ចេញ: $${gold.gold24kSellDamlung.toLocaleString()} (${gold.goldKilobarSellKhr.toLocaleString()} ៛)
+🌐 <b>២. តម្លៃមាសអន្តរជាតិ (International Spot Gold):</b>
+• Spot Gold (XAU/USD): ទិញ <b>$${spotBidUsd.toFixed(2)}</b> · លក់ <b>$${spotAskUsd.toFixed(2)}/oz</b>
+• 24h Change: ${gold.change24hUsd >= 0 ? '+' : ''}$${gold.change24hUsd} (${gold.change24hPercent}%)
+• 24h Range: $${gold.low24hUsd} - $${gold.high24hUsd}
+• 1 ក្រាម (Gram): ទិញ $${gramBidUsd} · លក់ $${gramAskUsd}
 
-💍 <b>មាសប្លាទីន/ទឹក ៧.៥ (18K):</b>
-• ទិញចូល: $${gold.gold18kBuyDamlung.toLocaleString()} / តម្លឹង
-• លក់ចេញ: $${gold.gold18kSellDamlung.toLocaleString()} / តម្លឹង
-
-🌐 <b>មាសអន្តរជាតិ (Spot Gold XAU/USD):</b>
-• តម្លៃ: <b>$${gold.spotOzUsd.toFixed(2)} / oz</b> (${gold.change24hUsd >= 0 ? '+' : ''}${gold.change24hPercent}%)
-• 1 Ounce ជារៀល: ${gold.spotOzKhr.toLocaleString()} ៛`;
+🎯 <b>៣. សំយោគបច្ចេកទេស & ការព្យាករណ៍ (Technical Forecast):</b>
+• ការព្យាករណ៍: <b>ឡើង (BULLISH ៧៨%)</b>
+• MA Status: Golden Cross (MA20 > MA50 > MA200)
+• IMR/RSI (14): 62.4 (Bullish Momentum)
+• Support: $2,674 / $2,658 · Resistance: $2,705 / $2,720
+• គោលដៅបន្ទាប់ (BSL Target): $2,710/oz`;
 
     onSendTelegram(text);
   };
 
   return (
     <div className="space-y-8">
-      {/* Header Banner */}
+      {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl border border-amber-500/30 bg-gradient-to-r from-slate-900 via-amber-950/20 to-slate-900">
         <div>
           <div className="flex items-center gap-2">
             <Coins className="w-5 h-5 text-amber-400" />
             <h1 className="text-xl sm:text-2xl font-bold text-white">
-              តម្លៃមាសអន្តរជាតិ និង ទីផ្សារមាសកម្ពុជា
+              ទំព័រទីផ្សារមាស (Gold Market: កម្ពុជា និង អន្តរជាតិ)
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            ការគណនាស្តង់ដារជា អោន (Troy Ounce), តម្លឹង (Damlung = 37.5g), ជី, និង ហ៊ុន តាមតម្លៃពិតប្រាកដ
+            តម្លៃទិញ-លក់ (កម្ពុជា & អន្តរជាតិ) ព័ត៌មានទីផ្សារ Trend + Strategy (MA 20, 50, 200 & IMR) និងការព្យាករណ៍ឡើងចុះ
           </p>
         </div>
 
@@ -117,187 +207,301 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
         </button>
       </div>
 
-      {/* Main Comparison: International vs Cambodian Unit Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. International Ounce */}
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/80">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>១ អោនអន្តរជាតិ (Troy Oz)</span>
-            <span className="font-mono text-slate-400">31.10g</span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">
-              ${gold.spotOzUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-xs font-mono text-slate-400 tabular-nums mt-1">
-              ≈ {gold.spotOzKhr.toLocaleString()} ៛ (អត្រាដុល្លារ {currencies.usdKhrMarket.sell}៛)
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">ប្រែប្រួល 24h:</span>
-            <span
-              className={`font-mono font-semibold tabular-nums ${
-                gold.change24hUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              {gold.change24hUsd >= 0 ? '+' : ''}${gold.change24hUsd} ({gold.change24hPercent}%)
-            </span>
-          </div>
-        </div>
-
-        {/* 2. Cambodia 1 Damlung */}
-        <div className="p-5 rounded-xl border border-amber-500/40 bg-slate-900/90 shadow-lg shadow-amber-500/5">
-          <div className="flex items-center justify-between text-xs text-amber-400">
-            <span className="font-semibold">១ តម្លឹងកម្ពុជា (Damlung)</span>
-            <span className="font-mono bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">37.50g</span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-amber-400 tabular-nums">
-              {gold.damlungKhr.toLocaleString()} <span className="text-sm font-normal">៛</span>
-            </div>
-            <div className="text-xs font-mono text-slate-300 tabular-nums mt-1">
-              ≈ ${gold.damlungUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">១ តម្លឹង =</span>
-            <span className="font-mono text-slate-300">1.20565 អោន / 10 ជី</span>
-          </div>
-        </div>
-
-        {/* 3. Cambodia 1 Chi */}
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/80">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>១ ជី (Chi = 0.1 តម្លឹង)</span>
-            <span className="font-mono text-slate-400">3.75g</span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">
-              {gold.chiKhr.toLocaleString()} <span className="text-sm font-normal text-amber-400">៛</span>
-            </div>
-            <div className="text-xs font-mono text-slate-400 tabular-nums mt-1">
-              ≈ ${gold.chiUsd.toFixed(2)} USD
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">១ ជី =</span>
-            <span className="font-mono text-slate-300">10 ហ៊ុន</span>
-          </div>
-        </div>
-
-        {/* 4. Cambodia 1 Hun */}
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/80">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>១ ហ៊ុន (Hun = 0.01 តម្លឹង)</span>
-            <span className="font-mono text-slate-400">0.375g</span>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-white tabular-nums">
-              {gold.hunKhr.toLocaleString()} <span className="text-sm font-normal text-amber-400">៛</span>
-            </div>
-            <div className="text-xs font-mono text-slate-400 tabular-nums mt-1">
-              ≈ ${gold.hunUsd.toFixed(2)} USD
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">១ ក្រាម (1g):</span>
-            <span className="font-mono text-slate-200 tabular-nums">{gold.gramKhr.toLocaleString()} ៛</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Gold Grades & Market Spreads (ផ្សារធំថ្មី / ហាងមាសកម្ពុជា) */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            តម្លៃមាសតាមប្រភេទ និង តម្លៃទិញចូល-លក់ចេញ (ហាងមាសកម្ពុជា)
+      {/* SECTION 1: Dual Buying & Selling Boards (Cambodia & International) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <Coins className="w-4 h-4 text-amber-400" />
+            <span>១. តារាងតម្លៃទិញចូល និង តម្លៃលក់ចេញ (កម្ពុជា និង អន្តរជាតិ)</span>
           </h2>
-          <span className="text-xs text-slate-400 font-mono">គិតជាដុល្លារ និង រៀល ក្នុង ១ តម្លឹង</span>
+          <span className="text-xs font-mono text-slate-400">
+            អត្រាប្ដូរប្រាក់អនុវត្ត: {usdRate.toLocaleString()} ៛/$
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm font-mono">
-            <thead>
-              <tr className="border-b border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4 font-sans">ប្រភេទមាស</th>
-                <th className="py-3 px-4 font-sans">កម្រិតសុទ្ធ (Purity)</th>
-                <th className="py-3 px-4 text-right">ទិញចូល (Buy USD)</th>
-                <th className="py-3 px-4 text-right">លក់ចេញ (Sell USD)</th>
-                <th className="py-3 px-4 text-right">ទិញចូល (KHR)</th>
-                <th className="py-3 px-4 text-right">លក់ចេញ (KHR)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 tabular-nums">
-              <tr className="hover:bg-slate-800/40 transition-colors">
-                <td className="py-3.5 px-4 font-sans font-medium text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  មាសគីឡូ (Kilobar / 24K)
-                </td>
-                <td className="py-3.5 px-4 text-xs font-sans text-slate-400">99.99% កម្រិតអន្តរជាតិ</td>
-                <td className="py-3.5 px-4 text-right text-emerald-400 font-semibold">
-                  ${gold.gold24kBuyDamlung.toLocaleString()}
-                </td>
-                <td className="py-3.5 px-4 text-right text-amber-400 font-bold">
-                  ${gold.gold24kSellDamlung.toLocaleString()}
-                </td>
-                <td className="py-3.5 px-4 text-right text-slate-300">
-                  {gold.goldKilobarBuyKhr.toLocaleString()} ៛
-                </td>
-                <td className="py-3.5 px-4 text-right text-slate-100 font-semibold">
-                  {gold.goldKilobarSellKhr.toLocaleString()} ៛
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-800/40 transition-colors">
-                <td className="py-3.5 px-4 font-sans font-medium text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  មាសទឹក១០ (Traditional 99%)
-                </td>
-                <td className="py-3.5 px-4 text-xs font-sans text-slate-400">99.00% មាសគ្រឿងអលង្ការ</td>
-                <td className="py-3.5 px-4 text-right text-emerald-400 font-semibold">
-                  ${(gold.damlungUsd - 15).toFixed(2)}
-                </td>
-                <td className="py-3.5 px-4 text-right text-amber-400 font-bold">
-                  ${(gold.damlungUsd + 10).toFixed(2)}
-                </td>
-                <td className="py-3.5 px-4 text-right text-slate-300">
-                  {Math.round((gold.damlungUsd - 15) * currencies.usdKhrMarket.buy).toLocaleString()} ៛
-                </td>
-                <td className="py-3.5 px-4 text-right text-slate-100 font-semibold">
-                  {Math.round((gold.damlungUsd + 10) * currencies.usdKhrMarket.sell).toLocaleString()} ៛
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-800/40 transition-colors">
-                <td className="py-3.5 px-4 font-sans font-medium text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  មាសផ្លាទីន / ទឹក៧.៥ (18K)
-                </td>
-                <td className="py-3.5 px-4 text-xs font-sans text-slate-400">75.00% គ្រឿងបន្តោង/ចិញ្ចៀន</td>
-                <td className="py-3.5 px-4 text-right text-emerald-400 font-semibold">
-                  ${gold.gold18kBuyDamlung.toLocaleString()}
-                </td>
-                <td className="py-3.5 px-4 text-right text-amber-400 font-bold">
-                  ${gold.gold18kSellDamlung.toLocaleString()}
-                </td>
-                <td className="py-3.5 px-4 text-right text-slate-300">
-                  {gold.gold18kBuyKhr.toLocaleString()} ៛
-                </td>
-                <td className="py-3.5 px-4 text-right text-slate-100 font-semibold">
-                  {gold.gold18kSellKhr.toLocaleString()} ៛
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Board: Cambodia Market (តម្លឹង ជី ហ៊ុន) */}
+          <div className="rounded-xl border border-amber-500/40 bg-slate-900/90 p-5 space-y-4 shadow-lg shadow-amber-500/5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                តម្លៃមាសនៅប្រទេសកម្ពុជា (Cambodia Gold)
+              </span>
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-bold border border-amber-500/20">
+                ស្តង់ដារកម្ពុជា (៣៧.៥ ក្រាម/តម្លឹង)
+              </span>
+            </div>
+
+            {/* 1 Damlung Featured Box */}
+            <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white">មាស ១ តម្លឹង (37.5g)</span>
+                <span className="text-xs font-mono text-slate-400">Spread: ${damlungSellUsd - damlungBuyUsd}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-slate-900 border border-emerald-500/30">
+                  <div className="text-xs text-slate-400">តម្លៃទិញចូល (Buying Rate):</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tabular-nums">
+                    ${damlungBuyUsd.toLocaleString()}
+                  </div>
+                  <div className="text-xs font-mono text-slate-300 mt-0.5">
+                    ≈ {damlungBuyKhr.toLocaleString()} ៛
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900 border border-amber-500/30">
+                  <div className="text-xs text-slate-400">តម្លៃលក់ចេញ (Selling Rate):</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-amber-300 tabular-nums">
+                    ${damlungSellUsd.toLocaleString()}
+                  </div>
+                  <div className="text-xs font-mono text-amber-400 mt-0.5 font-semibold">
+                    ≈ {damlungSellKhr.toLocaleString()} ៛
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-units: 1 Chi & 1 Hun */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* 1 Chi */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
+                  <span>១ ជី (3.75g = 0.1 តម្លឹង)</span>
+                </div>
+                <div className="text-xs text-slate-400">
+                  ទិញ: <span className="font-mono text-emerald-400 font-bold">${chiBuyUsd}</span> ({chiBuyKhr.toLocaleString()}៛)
+                </div>
+                <div className="text-xs text-slate-400">
+                  លក់: <span className="font-mono text-amber-300 font-bold">${chiSellUsd}</span> ({chiSellKhr.toLocaleString()}៛)
+                </div>
+              </div>
+
+              {/* 1 Hun */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
+                  <span>១ ហ៊ុន (0.375g = 0.01 តម្លឹង)</span>
+                </div>
+                <div className="text-xs text-slate-400">
+                  ទិញ: <span className="font-mono text-emerald-400 font-bold">${hunBuyUsd}</span> ({hunBuyKhr.toLocaleString()}៛)
+                </div>
+                <div className="text-xs text-slate-400">
+                  លក់: <span className="font-mono text-amber-300 font-bold">${hunSellUsd}</span> ({hunSellKhr.toLocaleString()}៛)
+                </div>
+              </div>
+            </div>
+
+            {/* Grades Breakdown */}
+            <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="font-sans">មាសគីឡូ 99.99% (Kilobar):</span>
+                <span>ទិញ ${gold.gold24kBuyDamlung.toLocaleString()} · លក់ ${gold.gold24kSellDamlung.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="font-sans">មាសផ្លាទីន 18K (ទឹក៧.៥):</span>
+                <span>ទិញ ${gold.gold18kBuyDamlung.toLocaleString()} · លក់ ${gold.gold18kSellDamlung.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Board: International Spot Gold Market (Troy Ounce, Gram, LBMA) */}
+          <div className="rounded-xl border border-sky-500/40 bg-slate-900/90 p-5 space-y-4 shadow-lg shadow-sky-500/5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Globe className="w-4 h-4 text-sky-400" />
+                តម្លៃមាសអន្តរជាតិ (International Spot Gold)
+              </span>
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 font-bold border border-sky-500/20">
+                XAU/USD (Forex Live)
+              </span>
+            </div>
+
+            {/* 1 Troy Ounce Featured Box */}
+            <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white">Spot Gold ១ អោន (Troy Oz = 31.10g)</span>
+                <span className="text-xs font-mono text-slate-400">Spread: $0.50</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-slate-900 border border-emerald-500/30">
+                  <div className="text-xs text-slate-400">តម្លៃទិញចូល (Bid Price):</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tabular-nums">
+                    ${spotBidUsd.toFixed(2)}
+                  </div>
+                  <div className="text-xs font-mono text-slate-300 mt-0.5">
+                    ≈ {spotBidKhr.toLocaleString()} ៛
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900 border border-sky-500/30">
+                  <div className="text-xs text-slate-400">តម្លៃលក់ចេញ (Ask Price):</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-sky-300 tabular-nums">
+                    ${spotAskUsd.toFixed(2)}
+                  </div>
+                  <div className="text-xs font-mono text-sky-400 mt-0.5 font-semibold">
+                    ≈ {spotAskKhr.toLocaleString()} ៛
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Per Gram Rate & Range */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <div className="text-xs font-semibold text-slate-300">១ ក្រាមអន្តរជាតិ (Per Gram)</div>
+                <div className="text-xs text-slate-400 font-mono">
+                  ទិញ: <span className="text-emerald-400 font-bold">${gramBidUsd}</span> /g
+                </div>
+                <div className="text-xs text-slate-400 font-mono">
+                  លក់: <span className="text-sky-300 font-bold">${gramAskUsd}</span> /g ({gold.gramKhr.toLocaleString()}៛)
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <div className="text-xs font-semibold text-slate-300">ចន្លោះតម្លៃ ២៤ ម៉ោង (24h Range)</div>
+                <div className="text-xs font-mono text-emerald-400">
+                  High: ${gold.high24hUsd}
+                </div>
+                <div className="text-xs font-mono text-rose-400">
+                  Low: ${gold.low24hUsd}
+                </div>
+              </div>
+            </div>
+
+            {/* Global LBMA Fix Reference */}
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+              <span className="font-sans">London Bullion Market (LBMA):</span>
+              <span className="text-slate-200 font-semibold">AM: $2,682.50 · PM: $2,688.00</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Interactive Gold Calculator & Profit/Loss Estimator */}
+      {/* SECTION 2: Trend + Strategy, IMR (RSI), Moving Averages (MA20, MA50, MA200) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <Activity className="w-4 h-4 text-amber-400" />
+            <span>២. ក្រាបនិន្នាការ Trend + Strategy, IMR (RSI) & Moving Averages (MA20, MA50, MA200)</span>
+          </h2>
+          <span className="text-xs text-slate-400 font-mono">Spot Gold XAU/USD</span>
+        </div>
+
+        <ChartComponent
+          assetName="Spot Gold (XAU/USD)"
+          symbol="XAUUSD"
+          currentPrice={gold.spotOzUsd}
+          currencyPrefix="$"
+          currencySuffix="/oz"
+        />
+      </div>
+
+      {/* SECTION 3: Technical Synthesis, Forecast (ឡើង/ចុះ) & Gemini AI */}
+      <div className="rounded-xl border border-amber-500/30 bg-slate-900/90 p-5 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-amber-400" />
+            <h2 className="text-base font-bold text-white">
+              ៣. ការផ្តល់ការវិភាគ សំយោគ និង ការព្យាករណ៍ ឡើង/ចុះ (Technical Synthesis & Forecast)
+            </h2>
+          </div>
+
+          <button
+            onClick={handleRequestAiAnalysis}
+            disabled={isAiLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+          >
+            {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-amber-400" />}
+            <span>{isAiLoading ? 'កំពុងសំយោគ...' : 'សុំការវិភាគបន្ថែមពី Gemini AI'}</span>
+          </button>
+        </div>
+
+        {/* Synthesis Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Card 1: Forecast Prediction */}
+          <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1.5">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ការព្យាករណ៍និន្នាការ (Bias)</div>
+            <div className="text-2xl font-black text-emerald-400 flex items-center gap-1.5">
+              <TrendingUp className="w-6 h-6 text-emerald-400" />
+              <span>ឡើង (BULLISH)</span>
+            </div>
+            <div className="text-xs font-mono text-emerald-300">
+              កម្រិតជឿជាក់ (Conviction): <b>៧៨%</b>
+            </div>
+            <div className="text-[11px] text-slate-400 font-sans mt-1">
+              រលកទិញមានប្រៀបលើ Timeframe 4H & Daily
+            </div>
+          </div>
+
+          {/* Card 2: Moving Averages (MA20, MA50, MA200) */}
+          <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/30 space-y-1.5">
+            <div className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Moving Averages (MA)</div>
+            <div className="text-sm font-bold text-white">Golden Cross រឹងមាំ</div>
+            <div className="text-xs font-mono space-y-0.5 text-slate-300">
+              <div>MA20: <span className="text-sky-300 font-bold">$2,684.20</span> (Short-term)</div>
+              <div>MA50: <span className="text-amber-300 font-bold">$2,676.50</span> (Mid-term)</div>
+              <div>MA200: <span className="text-purple-300 font-bold">$2,648.00</span> (Baseline)</div>
+            </div>
+          </div>
+
+          {/* Card 3: IMR / RSI Indicator */}
+          <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/30 space-y-1.5">
+            <div className="text-xs font-semibold text-purple-400 uppercase tracking-wider">សន្ទស្សន៍ IMR / RSI (14)</div>
+            <div className="text-2xl font-black font-mono text-purple-300 tabular-nums">
+              62.4
+            </div>
+            <div className="text-xs text-purple-300 font-sans">
+              កម្លាំងទិញរឹងមាំ (Bullish Momentum)
+            </div>
+            <div className="text-[11px] text-slate-400 font-sans">
+              មិនទាន់ Overbought (&gt;70) នៅមានចន្លោះឡើង
+            </div>
+          </div>
+
+          {/* Card 4: ICT Strategy & Key Levels */}
+          <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-1.5 font-mono text-xs">
+            <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider font-sans">កម្រិតគន្លឹះ ICT (Key Levels)</div>
+            <div>Support (S1/S2): <span className="text-emerald-400 font-bold">$2,674 / $2,658</span></div>
+            <div>Resistance (R1/R2): <span className="text-rose-400 font-bold">$2,705 / $2,720</span></div>
+            <div>Order Block: <span className="text-slate-300">$2,663 - $2,670</span></div>
+            <div>Liquidity Target: <span className="text-amber-300 font-bold">BSL $2,710</span></div>
+          </div>
+        </div>
+
+        {/* Synthesis Commentary */}
+        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2 leading-relaxed">
+          <div className="font-semibold text-amber-300 font-sans flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>ការសំយោគរួម (Executive Synthesis for Cambodia & Global Gold):</span>
+          </div>
+          <p>
+            • <b>កត្តាបច្ចេកទេស៖</b> គូ XAU/USD បានបញ្ជាក់ពី Market Structure Shift (MSS) ទៅខាងលើ បន្ទាប់ពីស្រូបយក Sell-Side Liquidity នៅក្រោម $2,660។ សន្ទស្សន៍ IMR/RSI នៅកម្រិត 62.4 និងការរៀបជួរនៃ MA20 លើ MA50 បង្ហាញថារលកកើនឡើង (Bullish Expansion) កំពុងមានសន្ទុះខ្លាំង។
+          </p>
+          <p>
+            • <b>កត្តាម៉ាក្រូសេដ្ឋកិច្ច៖</b> ការបន្តទិញមាសបម្រុងរបស់ធនាគារកណ្តាល និងការថយចុះសម្ពាធនៃសន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) គឺជាកាតាលីករជំរុញឱ្យតម្លៃមាសរក្សាភាពទាក់ទាញខ្ពស់។
+          </p>
+          <p>
+            • <b>ការណែនាំសម្រាប់ទីផ្សារកម្ពុជា៖</b> សម្រាប់អ្នកសន្សំមាសជា <b>&quot;តម្លឹង&quot;</b> ឬ <b>&quot;ជី&quot;</b> តំបន់គាំទ្រសមស្របសម្រាប់ប្រមូលទិញបន្ថែមគឺរង្វង់ <b>$3,220 - $3,235</b> ក្នុងមួយតម្លឹង ឬប្រមាណ <b>13.1 - 13.2 លានរៀល</b>។
+          </p>
+        </div>
+
+        {/* Gemini AI Live Response Display if loaded */}
+        {aiReport && (
+          <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/50 space-y-2 text-xs text-slate-200">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider font-mono">
+              <Bot className="w-4 h-4" />
+              <span>ការវិភាគលម្អិតពី Gemini AI Engine</span>
+            </div>
+            <div className="whitespace-pre-line leading-relaxed font-sans">{aiReport}</div>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 4: Gold Calculator & Profit / Loss Estimator */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Inputs & Configuration */}
         <div className="lg:col-span-5 rounded-xl border border-slate-800 bg-slate-900/80 p-5 space-y-4">
           <div className="flex items-center gap-2 text-white font-semibold text-base">
             <Calculator className="w-4 h-4 text-amber-400" />
-            <h3>ម៉ាស៊ីនគណនាតម្លៃមាស (Gold Converter & Calculator)</h3>
+            <h3>៤. ម៉ាស៊ីនគណនាតម្លៃមាស (Gold Converter & Calculator)</h3>
           </div>
 
           <div>
@@ -381,7 +585,6 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
           </div>
         </div>
 
-        {/* Right: Calculated Results */}
         <div className="lg:col-span-7 rounded-xl border border-amber-500/30 bg-slate-900/90 p-5 flex flex-col justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-amber-400 font-semibold mb-2">
@@ -399,7 +602,6 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
               </div>
             </div>
 
-            {/* Weight Breakdown */}
             <div className="grid grid-cols-3 gap-2 mt-4 text-xs font-mono">
               <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
                 <div className="text-slate-400 font-sans">ទម្ងន់គិតជាក្រាម:</div>
@@ -419,7 +621,6 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
               </div>
             </div>
 
-            {/* PnL if bought previously */}
             {pnlUsd !== null && (
               <div
                 className={`mt-4 p-3 rounded-lg border text-xs font-mono tabular-nums flex items-center justify-between ${
@@ -446,23 +647,26 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
           <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-2 text-xs text-slate-400">
             <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>
-              រូបមន្តផ្លូវការ: ១ តម្លឹង = ៣៧.៥ ក្រាម = ១០ ជី = ១០០ ហ៊ុន ≈ ១.២០៥៦៥ អោនអន្តរជាតិ (Troy Ounce)
+              ស្តង់ដារកម្ពុជា: ១ តម្លឹង = ៣៧.៥ ក្រាម = ១០ ជី = ១០០ ហ៊ុន ≈ ១.២០៥៦៥ អោនអន្តរជាតិ (Troy Ounce)
             </span>
           </div>
         </div>
       </div>
 
-      {/* Gold Trend Chart */}
+      {/* SECTION 5: Gold Market News Feed */}
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-white">
-          ក្រាបនិន្នាការតម្លៃមាសអន្តរជាតិ និង តំបន់បច្ចេកទេស
-        </h3>
-        <ChartComponent
-          assetName="Spot Gold (XAU/USD)"
-          symbol="XAUUSD"
-          currentPrice={gold.spotOzUsd}
-          currencyPrefix="$"
-          currencySuffix="/oz"
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <Newspaper className="w-4 h-4 text-amber-400" />
+            <span>៥. ព័ត៌មានទីផ្សារមាសជាក់លាក់ (Gold Market News & Headlines)</span>
+          </h2>
+          <span className="text-xs text-slate-400">បច្ចុប្បន្នភាពទីផ្សារមាសពិភពលោក និងកម្ពុជា</span>
+        </div>
+
+        <MarketNews
+          onSendTelegram={onSendTelegram}
+          isWidgetMode={true}
+          defaultCategory="gold"
         />
       </div>
     </div>

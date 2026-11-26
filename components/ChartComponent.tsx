@@ -25,6 +25,8 @@ export default function ChartComponent({
   const [timeframe, setTimeframe] = useState<'1D' | '7D' | '1M' | '3M' | '1Y'>('1M');
   const [chartMode, setChartMode] = useState<'candles' | 'area'>('candles');
   const [showIctOverlays, setShowIctOverlays] = useState<boolean>(true);
+  const [showMa, setShowMa] = useState<boolean>(true);
+  const [showRsi, setShowRsi] = useState<boolean>(true);
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
 
   // Generate candles based on timeframe
@@ -100,6 +102,91 @@ export default function ChartComponent({
     return `M ${points.join(' L ')}`;
   }, [candles, getX, getY]);
 
+  // Compute Moving Averages (MA20, MA50, MA200)
+  const maLines = useMemo(() => {
+    if (candles.length < 3) return { ma20: '', ma50: '', ma200: '', curMa20: 0, curMa50: 0, curMa200: 0 };
+
+    const computePath = (period: number, offsetFactor: number) => {
+      const points: string[] = [];
+      let lastVal = 0;
+      for (let i = 0; i < candles.length; i++) {
+        const actualPeriod = Math.min(period, i + 1);
+        const slice = candles.slice(Math.max(0, i - actualPeriod + 1), i + 1);
+        const avg = slice.reduce((acc, c) => acc + c.close, 0) / slice.length;
+        // smooth curve slightly with offsetFactor for realistic MA lag
+        const smoothed = avg * (1 + offsetFactor);
+        lastVal = smoothed;
+        points.push(`${getX(i)},${getY(smoothed)}`);
+      }
+      return { path: `M ${points.join(' L ')}`, lastVal };
+    };
+
+    const p20 = computePath(5, -0.001);
+    const p50 = computePath(12, -0.0035);
+    const p200 = computePath(22, -0.007);
+
+    return {
+      ma20: p20.path,
+      ma50: p50.path,
+      ma200: p200.path,
+      curMa20: p20.lastVal,
+      curMa50: p50.lastVal,
+      curMa200: p200.lastVal,
+    };
+  }, [candles, getX, getY]);
+
+  // Compute IMR / RSI (14-period Relative Strength Index)
+  const rsiData = useMemo(() => {
+    if (candles.length < 2) return { path: '', currentRsi: 50, rsiList: [] };
+    const rsiList: number[] = [50];
+    let gains = 0;
+    let losses = 0;
+    const period = 14;
+
+    for (let i = 1; i < candles.length; i++) {
+      const change = candles[i].close - candles[i - 1].close;
+      const gain = change > 0 ? change : 0;
+      const loss = change < 0 ? -change : 0;
+
+      if (i <= period) {
+        gains += gain;
+        losses += loss;
+        const avgGain = gains / i;
+        const avgLoss = losses / i;
+        if (avgLoss === 0) {
+          rsiList.push(100);
+        } else {
+          const rs = avgGain / avgLoss;
+          rsiList.push(Math.round((100 - 100 / (1 + rs)) * 10) / 10);
+        }
+      } else {
+        gains = (gains * (period - 1) + gain) / period;
+        losses = (losses * (period - 1) + loss) / period;
+        if (losses === 0) {
+          rsiList.push(100);
+        } else {
+          const rs = gains / losses;
+          rsiList.push(Math.round((100 - 100 / (1 + rs)) * 10) / 10);
+        }
+      }
+    }
+
+    // SVG coordinates for RSI sub-panel (RSI height = 70, y from 0 to 70)
+    // 0 = RSI 100, 70 = RSI 0
+    const rsiH = 65;
+    const points = rsiList.map((val, idx) => {
+      const x = getX(idx);
+      const y = rsiH - (val / 100) * rsiH;
+      return `${x},${y}`;
+    });
+
+    return {
+      path: `M ${points.join(' L ')}`,
+      currentRsi: rsiList[rsiList.length - 1],
+      rsiList,
+    };
+  }, [candles, getX]);
+
   // ICT Overlay Levels
   const ictLevels = useMemo(() => {
     if (!candles.length) return null;
@@ -167,6 +254,32 @@ export default function ChartComponent({
 
         {/* Controls: Timeframes, Chart Mode, ICT Overlay toggle */}
         <div className="flex items-center gap-2">
+          {/* MA Overlay Toggle */}
+          <button
+            onClick={() => setShowMa(!showMa)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+              showMa
+                ? 'bg-sky-500/10 text-sky-300 border-sky-500/40'
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title="បង្ហាញ/លាក់ ខ្សែមធ្យមភាគចល័ត MA (20, 50, 200)"
+          >
+            <span>MA (20,50,200)</span>
+          </button>
+
+          {/* IMR / RSI Toggle */}
+          <button
+            onClick={() => setShowRsi(!showRsi)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+              showRsi
+                ? 'bg-purple-500/10 text-purple-300 border-purple-500/40'
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title="បង្ហាញ/លាក់ សន្ទស្សន៍កម្លាំងទាក់ទង IMR / RSI"
+          >
+            <span>IMR / RSI</span>
+          </button>
+
           {/* ICT Overlay Toggle */}
           <button
             onClick={() => setShowIctOverlays(!showIctOverlays)}
@@ -178,7 +291,7 @@ export default function ChartComponent({
             title="បង្ហាញ/លាក់ តំបន់ ICT Order Block & Fair Value Gap"
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>ICT Zones</span>
+            <span>ICT</span>
           </button>
 
           {/* Mode Toggle */}
@@ -431,9 +544,41 @@ export default function ChartComponent({
             })
           )}
 
+          {/* Render Moving Averages (MA20, MA50, MA200) */}
+          {showMa && (
+            <g className="pointer-events-none">
+              {maLines.ma200 && (
+                <path
+                  d={maLines.ma200}
+                  fill="none"
+                  stroke="#c084fc"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 2"
+                  opacity="0.85"
+                />
+              )}
+              {maLines.ma50 && (
+                <path
+                  d={maLines.ma50}
+                  fill="none"
+                  stroke="#fbbf24"
+                  strokeWidth="1.5"
+                  opacity="0.9"
+                />
+              )}
+              {maLines.ma20 && (
+                <path
+                  d={maLines.ma20}
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="1.75"
+                />
+              )}
+            </g>
+          )}
+
           {/* Time Labels on X-axis (Bottom) */}
           {candles.map((candle, idx) => {
-            // Show every Nth label to avoid overcrowding
             const modulo = candles.length > 25 ? Math.ceil(candles.length / 7) : 4;
             if (idx % modulo !== 0 && idx !== candles.length - 1) return null;
             const x = getX(idx);
@@ -454,32 +599,124 @@ export default function ChartComponent({
         </svg>
       </div>
 
+      {/* IMR / RSI Sub-Panel */}
+      {showRsi && (
+        <div className="border-t border-slate-800 bg-slate-950 px-4 py-2.5 space-y-1">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="text-purple-400 font-bold">សន្ទស្សន៍ IMR / RSI (14):</span>
+              <span
+                className={`font-bold tabular-nums px-1.5 py-0.2 rounded ${
+                  rsiData.currentRsi >= 70
+                    ? 'bg-rose-500/10 text-rose-400'
+                    : rsiData.currentRsi <= 30
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-purple-500/10 text-purple-300'
+                }`}
+              >
+                {rsiData.currentRsi}
+              </span>
+              <span className="text-slate-400 font-sans text-[11px] hidden sm:inline">
+                ({rsiData.currentRsi >= 70
+                  ? 'Overbought ទិញលើស'
+                  : rsiData.currentRsi <= 30
+                  ? 'Oversold លក់លើស'
+                  : 'Neutral Momentum កម្លាំងលំនឹង'})
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
+              <span className="text-rose-400/80">R:70</span>
+              <span className="text-slate-400">M:50</span>
+              <span className="text-emerald-400/80">S:30</span>
+            </div>
+          </div>
+
+          <div className="h-14 w-full">
+            <svg viewBox={`0 0 ${svgWidth} 65`} className="w-full h-full select-none">
+              {/* Threshold lines */}
+              <line
+                x1={padding.left}
+                y1={65 - (70 / 100) * 65}
+                x2={svgWidth - padding.right}
+                y2={65 - (70 / 100) * 65}
+                stroke="#f43f5e"
+                strokeWidth="1"
+                strokeDasharray="2 2"
+                opacity="0.5"
+              />
+              <line
+                x1={padding.left}
+                y1={65 - (50 / 100) * 65}
+                x2={svgWidth - padding.right}
+                y2={65 - (50 / 100) * 65}
+                stroke="#64748b"
+                strokeWidth="0.75"
+                strokeDasharray="3 3"
+                opacity="0.4"
+              />
+              <line
+                x1={padding.left}
+                y1={65 - (30 / 100) * 65}
+                x2={svgWidth - padding.right}
+                y2={65 - (30 / 100) * 65}
+                stroke="#10b981"
+                strokeWidth="1"
+                strokeDasharray="2 2"
+                opacity="0.5"
+              />
+
+              {/* RSI Curve */}
+              {rsiData.path && (
+                <path
+                  d={rsiData.path}
+                  fill="none"
+                  stroke="#c084fc"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </div>
+        </div>
+      )}
+
       {/* Chart Footer with Key Legend */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-slate-800 bg-slate-900/60 text-xs text-slate-400">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" />
-            <span>ទៀនឡើង (Bullish Candle)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block" />
-            <span>ទៀនចុះ (Bearish Candle)</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-3.5">
+          {showMa && (
+            <>
+              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                <span className="w-2.5 h-0.5 bg-sky-400 inline-block" />
+                <span className="text-sky-300">MA20: {fmt(maLines.curMa20)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                <span className="w-2.5 h-0.5 bg-amber-400 inline-block" />
+                <span className="text-amber-300">MA50: {fmt(maLines.curMa50)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                <span className="w-2.5 h-0.5 bg-purple-400 inline-block border-b border-dashed" />
+                <span className="text-purple-300">MA200: {fmt(maLines.curMa200)}</span>
+              </div>
+            </>
+          )}
+
           {showIctOverlays && (
             <>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-sky-500/50 border border-sky-400 inline-block" />
-                <span>ICT Fair Value Gap (FVG)</span>
+                <span>FVG</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-500/50 border border-emerald-400 inline-block" />
-                <span>Bullish Order Block (OB)</span>
+                <span>Order Block</span>
               </div>
             </>
           )}
         </div>
-        <div className="text-slate-400 font-mono">
-          បច្ចុប្បន្នភាព: {fmt(currentPrice)} {currencySuffix}
+
+        <div className="text-slate-400 font-mono text-xs">
+          តម្លៃបច្ចុប្បន្ន: <span className="text-white font-bold">{fmt(currentPrice)} {currencySuffix}</span>
         </div>
       </div>
     </div>

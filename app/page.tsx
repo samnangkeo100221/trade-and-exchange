@@ -27,20 +27,17 @@ import {
 } from '@/lib/storage';
 
 import Navbar from '@/components/Navbar';
-import OverviewTab from '@/components/OverviewTab';
 import GoldTab from '@/components/GoldTab';
 import CurrenciesTab from '@/components/CurrenciesTab';
 import FuelTab from '@/components/FuelTab';
-import IctAnalysisTab from '@/components/IctAnalysisTab';
 import HistoryTab from '@/components/HistoryTab';
 import TelegramTab from '@/components/TelegramTab';
 import TelegramModal from '@/components/TelegramModal';
-import MarketNews from '@/components/MarketNews';
 
-import { TrendingUp, TrendingDown, Coins, DollarSign, Fuel, Shield, Bell } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('gold');
 
   // Market state
   const [gold, setGold] = useState<GoldPrice>(INITIAL_GOLD_DATA);
@@ -343,19 +340,7 @@ export default function HomePage() {
 
       {/* Main Container Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 md:py-8">
-        {activeTab === 'overview' && (
-          <OverviewTab
-            gold={gold}
-            currencies={currencies}
-            fuel={fuel}
-            ict={ict}
-            onTabChange={setActiveTab}
-            onTakeSnapshot={() => handleTakeSnapshot()}
-            onQuickTelegram={handleOpenTelegramSummary}
-          />
-        )}
-
-        {activeTab === 'gold' && (
+        {(activeTab === 'gold' || activeTab === 'overview') && (
           <GoldTab
             gold={gold}
             currencies={currencies}
@@ -379,28 +364,6 @@ export default function HomePage() {
         {activeTab === 'fuel' && (
           <FuelTab
             fuel={fuel}
-            onSendTelegram={(msg) => {
-              setModalDefaultMsg(msg);
-              setIsTelegramModalOpen(true);
-            }}
-          />
-        )}
-
-        {activeTab === 'ict' && (
-          <IctAnalysisTab
-            ict={ict}
-            gold={gold}
-            currencies={currencies}
-            fuel={fuel}
-            onSendTelegram={(msg) => {
-              setModalDefaultMsg(msg);
-              setIsTelegramModalOpen(true);
-            }}
-          />
-        )}
-
-        {activeTab === 'news' && (
-          <MarketNews
             onSendTelegram={(msg) => {
               setModalDefaultMsg(msg);
               setIsTelegramModalOpen(true);

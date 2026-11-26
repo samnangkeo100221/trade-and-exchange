@@ -22,19 +22,21 @@ import {
 
 interface MarketNewsProps {
   onSendTelegram: (text: string) => void;
-  isWidgetMode?: boolean; // When embedded in Overview tab
+  isWidgetMode?: boolean; // When embedded in subpages
   onViewAll?: () => void;
+  defaultCategory?: 'all' | 'gold' | 'currency' | 'fuel' | 'cambodia' | 'macro';
 }
 
 export default function MarketNews({
   onSendTelegram,
   isWidgetMode = false,
   onViewAll,
+  defaultCategory = 'all',
 }: MarketNewsProps) {
   const [newsList, setNewsList] = useState<MarketNewsItem[]>(INITIAL_NEWS_ITEMS);
   const [selectedCategory, setSelectedCategory] = useState<
     'all' | 'gold' | 'currency' | 'fuel' | 'cambodia' | 'macro'
-  >('all');
+  >(defaultCategory);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [impactFilter, setImpactFilter] = useState<'all' | 'BULLISH' | 'BEARISH' | 'NEUTRAL'>('all');
   const [isFetching, setIsFetching] = useState<boolean>(false);
