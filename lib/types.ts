@@ -1,3 +1,11 @@
+export interface GoldIntradayPoint {
+  time: string;
+  timestamp: number;
+  price: number;
+  high?: number;
+  low?: number;
+}
+
 export interface GoldPrice {
   spotOzUsd: number;
   spotOzKhr: number;
@@ -19,8 +27,11 @@ export interface GoldPrice {
   gold18kSellKhr: number;
   change24hUsd: number;
   change24hPercent: number;
+  prevCloseUsd?: number;
   high24hUsd: number;
   low24hUsd: number;
+  history24h?: GoldIntradayPoint[];
+  source?: string;
   lastUpdated: string;
 }
 
@@ -46,6 +57,10 @@ export interface CurrencyRates {
   };
   cnyKhr: {
     rate: number;
+    buyCash?: number;
+    sellCash?: number;
+    buyAccount?: number;
+    sellAccount?: number;
     change24h: number;
   };
   cnyUsd: {
@@ -54,14 +69,42 @@ export interface CurrencyRates {
   };
   thbKhr: {
     rate: number;
+    buyCash?: number;
+    sellCash?: number;
+    buyAccount?: number;
+    sellAccount?: number;
     change24h: number;
   };
   eurKhr: {
     rate: number;
+    buyCash?: number;
+    sellCash?: number;
+    buyAccount?: number;
+    sellAccount?: number;
     change24h: number;
   };
   vndKhr: {
     rate: number; // per 10,000 VND
+    perVndBuy?: number; // 0.1545 KHR
+    perVndSell?: number; // 0.1570 KHR
+    buyCash?: number;
+    sellCash?: number;
+    buyAccount?: number;
+    sellAccount?: number;
+    change24h: number;
+  };
+  lakKhr?: {
+    rate: number; // per 1,000 LAK
+    perLakBuy?: number; // 0.1699 KHR
+    perLakSell?: number; // 0.1998 KHR
+    buyCash?: number;
+    sellCash?: number;
+    change24h: number;
+  };
+  audKhr?: {
+    rate: number;
+    buyCash: number;
+    sellCash: number;
     change24h: number;
   };
   lastUpdated: string;

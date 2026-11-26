@@ -30,15 +30,26 @@ import {
   Clock,
 } from 'lucide-react';
 import ChartComponent from './ChartComponent';
+import SpotGold24hChart from './SpotGold24hChart';
 import MarketNews from './MarketNews';
 
 interface GoldTabProps {
   gold: GoldPrice;
   currencies: CurrencyRates;
   onSendTelegram: (text: string) => void;
+  isLiveLoading?: boolean;
+  liveError?: string | null;
+  onRefreshLive?: () => void;
 }
 
-export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabProps) {
+export default function GoldTab({
+  gold,
+  currencies,
+  onSendTelegram,
+  isLiveLoading = false,
+  liveError = null,
+  onRefreshLive,
+}: GoldTabProps) {
   // Calculator State
   const [calcAmount, setCalcAmount] = useState<number>(1);
   const [calcUnit, setCalcUnit] = useState<'damlung' | 'chi' | 'hun' | 'ounce' | 'gram'>('damlung');
@@ -154,8 +165,58 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
     }
   };
 
+  // Dynamic intraday & structural technical metrics derived from live Spot Gold & 24h history
+  const livePrices = (gold.history24h || []).map((p) => p.price).filter((p) => p > 0);
+  const avgSlice = (arr: number[], count: number) => {
+    const slice = arr.slice(-count);
+    if (slice.length === 0) return gold.spotOzUsd;
+    return slice.reduce((sum, v) => sum + v, 0) / slice.length;
+  };
+  const ma20Val = Math.round(avgSlice(livePrices, 20) * 100) / 100;
+  const ma50Val = Math.round(avgSlice(livePrices, 50) * 100) / 100;
+  const ma200Val = Math.round((livePrices.length > 0 ? avgSlice(livePrices, livePrices.length) : gold.prevCloseUsd || gold.spotOzUsd) * 100) / 100;
+
+  // Compute RSI(14) from 24h intraday ticks when available
+  const rsi14 = (() => {
+    const sample = livePrices.slice(-15);
+    if (sample.length < 4) return gold.change24hPercent >= 0 ? 56.5 : 44.2;
+    let gains = 0;
+    let losses = 0;
+    for (let i = 1; i < sample.length; i++) {
+      const diff = sample[i] - sample[i - 1];
+      if (diff >= 0) gains += diff;
+      else losses += Math.abs(diff);
+    }
+    if (losses === 0) return gains > 0 ? 72.0 : 50.0;
+    const rs = gains / losses;
+    return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
+  })();
+
+  const isTrendBullish = gold.spotOzUsd >= ma20Val && gold.change24hUsd >= 0;
+  const isTrendBearish = gold.spotOzUsd < ma20Val && gold.change24hUsd < 0;
+  const convictionPct = Math.min(86, Math.max(54, Math.round(58 + Math.abs(gold.change24hPercent) * 6)));
+
+  const rangeSpan = Math.max(gold.high24hUsd - gold.low24hUsd, gold.spotOzUsd * 0.005);
+  const support1 = Math.round(gold.low24hUsd);
+  const support2 = Math.round(gold.low24hUsd - rangeSpan * 0.35);
+  const resistance1 = Math.round(gold.high24hUsd);
+  const resistance2 = Math.round(gold.high24hUsd + rangeSpan * 0.35);
+  const obLow = Math.round(gold.low24hUsd + rangeSpan * 0.12);
+  const obHigh = Math.round(gold.low24hUsd + rangeSpan * 0.32);
+  const bslTarget = Math.round(gold.high24hUsd + rangeSpan * 0.25);
+
+  const damlungSupportLow = Math.round(support1 * DAMLUNG_TO_TROY_OZ);
+  const damlungSupportHigh = Math.round((support1 + rangeSpan * 0.25) * DAMLUNG_TO_TROY_OZ);
+  const damlungSupportMillionLow = ((damlungSupportLow * usdRate) / 1000000).toFixed(2);
+  const damlungSupportMillionHigh = ((damlungSupportHigh * usdRate) / 1000000).toFixed(2);
+
   // Telegram report
   const handleTelegramGoldReport = () => {
+    const biasText = isTrendBullish
+      ? `ឡើង (BULLISH ${convictionPct}%)`
+      : isTrendBearish
+      ? `ចុះ (BEARISH ${convictionPct}%)`
+      : `រង់ចាំ (NEUTRAL ${convictionPct}%)`;
     const text = `🟡 <b>របាយការណ៍ទីផ្សារមាសពេញលេញ (Gold Market Report)</b>
 📅 ${gold.lastUpdated}
 
@@ -169,15 +230,15 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
 🌐 <b>២. តម្លៃមាសអន្តរជាតិ (International Spot Gold):</b>
 • Spot Gold (XAU/USD): ទិញ <b>$${spotBidUsd.toFixed(2)}</b> · លក់ <b>$${spotAskUsd.toFixed(2)}/oz</b>
 • 24h Change: ${gold.change24hUsd >= 0 ? '+' : ''}$${gold.change24hUsd} (${gold.change24hPercent}%)
-• 24h Range: $${gold.low24hUsd} - $${gold.high24hUsd}
+• 24h Range: $${gold.low24hUsd.toFixed(2)} - $${gold.high24hUsd.toFixed(2)}
 • 1 ក្រាម (Gram): ទិញ $${gramBidUsd} · លក់ $${gramAskUsd}
 
 🎯 <b>៣. សំយោគបច្ចេកទេស & ការព្យាករណ៍ (Technical Forecast):</b>
-• ការព្យាករណ៍: <b>ឡើង (BULLISH ៧៨%)</b>
-• MA Status: Golden Cross (MA20 > MA50 > MA200)
-• IMR/RSI (14): 62.4 (Bullish Momentum)
-• Support: $2,674 / $2,658 · Resistance: $2,705 / $2,720
-• គោលដៅបន្ទាប់ (BSL Target): $2,710/oz`;
+• ការព្យាករណ៍: <b>${biasText}</b>
+• MA20 / MA50 / Avg: $${ma20Val.toFixed(2)} / $${ma50Val.toFixed(2)} / $${ma200Val.toFixed(2)}
+• IMR/RSI (14): ${rsi14}
+• Support: $${support1.toLocaleString()} / $${support2.toLocaleString()} · Resistance: $${resistance1.toLocaleString()} / $${resistance2.toLocaleString()}
+• គោលដៅបន្ទាប់ (BSL Target): $${bslTarget.toLocaleString()}/oz`;
 
     onSendTelegram(text);
   };
@@ -367,24 +428,34 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
               </div>
             </div>
 
-            {/* Global LBMA Fix Reference */}
+            {/* Live Reference Footer */}
             <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-              <span className="font-sans">London Bullion Market (LBMA):</span>
-              <span className="text-slate-200 font-semibold">AM: $2,682.50 · PM: $2,688.00</span>
+              <span className="font-sans">ប្រភពទិន្នន័យផ្ទាល់:</span>
+              <span className="text-slate-200 font-semibold">
+                {gold.source || 'Spot Gold Live Feed'} · Prev Close: ${(gold.prevCloseUsd ?? gold.spotOzUsd).toFixed(2)}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* SECTION 2: Trend + Strategy, IMR (RSI), Moving Averages (MA20, MA50, MA200) */}
+      {/* SECTION 2: 24h Real-Time Spot Gold Chart (Recharts) & Multi-Timeframe Strategy */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <Activity className="w-4 h-4 text-amber-400" />
-            <span>២. ក្រាបនិន្នាការ Trend + Strategy, IMR (RSI) & Moving Averages (MA20, MA50, MA200)</span>
+            <span>២. ក្រាបនិន្នាការតម្លៃមាស ២៤ ម៉ោង (24h Spot Gold Chart) &amp; Strategy</span>
           </h2>
           <span className="text-xs text-slate-400 font-mono">Spot Gold XAU/USD</span>
         </div>
+
+        <SpotGold24hChart
+          gold={gold}
+          currencies={currencies}
+          isLoading={isLiveLoading}
+          error={liveError}
+          onRefresh={onRefreshLive}
+        />
 
         <ChartComponent
           assetName="Spot Gold (XAU/USD)"
@@ -418,28 +489,56 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
         {/* Synthesis Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Card 1: Forecast Prediction */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1.5">
+          <div
+            className={`p-4 rounded-xl bg-slate-950 border space-y-1.5 ${
+              isTrendBullish
+                ? 'border-emerald-500/40'
+                : isTrendBearish
+                ? 'border-rose-500/40'
+                : 'border-amber-500/40'
+            }`}
+          >
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ការព្យាករណ៍និន្នាការ (Bias)</div>
-            <div className="text-2xl font-black text-emerald-400 flex items-center gap-1.5">
-              <TrendingUp className="w-6 h-6 text-emerald-400" />
-              <span>ឡើង (BULLISH)</span>
+            <div
+              className={`text-2xl font-black flex items-center gap-1.5 ${
+                isTrendBullish
+                  ? 'text-emerald-400'
+                  : isTrendBearish
+                  ? 'text-rose-400'
+                  : 'text-amber-300'
+              }`}
+            >
+              {isTrendBearish ? (
+                <TrendingDown className="w-6 h-6 text-rose-400" />
+              ) : (
+                <TrendingUp className="w-6 h-6 text-emerald-400" />
+              )}
+              <span>
+                {isTrendBullish
+                  ? 'ឡើង (BULLISH)'
+                  : isTrendBearish
+                  ? 'ចុះ (BEARISH)'
+                  : 'តុល្យភាព (NEUTRAL)'}
+              </span>
             </div>
-            <div className="text-xs font-mono text-emerald-300">
-              កម្រិតជឿជាក់ (Conviction): <b>៧៨%</b>
+            <div className="text-xs font-mono text-slate-200">
+              កម្រិតជឿជាក់ (Conviction): <b>{convictionPct}%</b>
             </div>
             <div className="text-[11px] text-slate-400 font-sans mt-1">
-              រលកទិញមានប្រៀបលើ Timeframe 4H & Daily
+              គណនាពីតម្លៃបច្ចុប្បន្ន និងនិន្នាការ ២៤ ម៉ោង
             </div>
           </div>
 
-          {/* Card 2: Moving Averages (MA20, MA50, MA200) */}
+          {/* Card 2: Moving Averages (MA20, MA50, 24h Avg) */}
           <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/30 space-y-1.5">
             <div className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Moving Averages (MA)</div>
-            <div className="text-sm font-bold text-white">Golden Cross រឹងមាំ</div>
-            <div className="text-xs font-mono space-y-0.5 text-slate-300">
-              <div>MA20: <span className="text-sky-300 font-bold">$2,684.20</span> (Short-term)</div>
-              <div>MA50: <span className="text-amber-300 font-bold">$2,676.50</span> (Mid-term)</div>
-              <div>MA200: <span className="text-purple-300 font-bold">$2,648.00</span> (Baseline)</div>
+            <div className="text-sm font-bold text-white">
+              {ma20Val >= ma50Val ? 'Bullish Alignment (MA20 ≥ MA50)' : 'Bearish Pullback (MA20 < MA50)'}
+            </div>
+            <div className="text-xs font-mono space-y-0.5 text-slate-300 tabular-nums">
+              <div>MA20: <span className="text-sky-300 font-bold">${ma20Val.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> (Short-term)</div>
+              <div>MA50: <span className="text-amber-300 font-bold">${ma50Val.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> (Mid-term)</div>
+              <div>24h Avg: <span className="text-purple-300 font-bold">${ma200Val.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> (Baseline)</div>
             </div>
           </div>
 
@@ -447,23 +546,29 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
           <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/30 space-y-1.5">
             <div className="text-xs font-semibold text-purple-400 uppercase tracking-wider">សន្ទស្សន៍ IMR / RSI (14)</div>
             <div className="text-2xl font-black font-mono text-purple-300 tabular-nums">
-              62.4
+              {rsi14}
             </div>
             <div className="text-xs text-purple-300 font-sans">
-              កម្លាំងទិញរឹងមាំ (Bullish Momentum)
+              {rsi14 >= 70
+                ? 'កម្រិតទិញលើស (Overbought)'
+                : rsi14 <= 30
+                ? 'កម្រិតលក់លើស (Oversold)'
+                : rsi14 >= 50
+                ? 'កម្លាំងទិញរឹងមាំ (Bullish Momentum)'
+                : 'សម្ពាធលក់ស្រាល (Bearish Pressure)'}
             </div>
             <div className="text-[11px] text-slate-400 font-sans">
-              មិនទាន់ Overbought (&gt;70) នៅមានចន្លោះឡើង
+              គណនាដោយផ្ទាល់ពីទិន្នន័យក្រាប ២៤ ម៉ោង
             </div>
           </div>
 
           {/* Card 4: ICT Strategy & Key Levels */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-1.5 font-mono text-xs">
+          <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-1.5 font-mono text-xs tabular-nums">
             <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider font-sans">កម្រិតគន្លឹះ ICT (Key Levels)</div>
-            <div>Support (S1/S2): <span className="text-emerald-400 font-bold">$2,674 / $2,658</span></div>
-            <div>Resistance (R1/R2): <span className="text-rose-400 font-bold">$2,705 / $2,720</span></div>
-            <div>Order Block: <span className="text-slate-300">$2,663 - $2,670</span></div>
-            <div>Liquidity Target: <span className="text-amber-300 font-bold">BSL $2,710</span></div>
+            <div>Support (S1/S2): <span className="text-emerald-400 font-bold">${support1.toLocaleString()} / ${support2.toLocaleString()}</span></div>
+            <div>Resistance (R1/R2): <span className="text-rose-400 font-bold">${resistance1.toLocaleString()} / ${resistance2.toLocaleString()}</span></div>
+            <div>Order Block: <span className="text-slate-300">${obLow.toLocaleString()} - ${obHigh.toLocaleString()}</span></div>
+            <div>Liquidity Target: <span className="text-amber-300 font-bold">BSL ${bslTarget.toLocaleString()}</span></div>
           </div>
         </div>
 
@@ -471,16 +576,16 @@ export default function GoldTab({ gold, currencies, onSendTelegram }: GoldTabPro
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2 leading-relaxed">
           <div className="font-semibold text-amber-300 font-sans flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>ការសំយោគរួម (Executive Synthesis for Cambodia & Global Gold):</span>
+            <span>ការសំយោគរួម (Executive Synthesis for Cambodia &amp; Global Gold):</span>
           </div>
           <p>
-            • <b>កត្តាបច្ចេកទេស៖</b> គូ XAU/USD បានបញ្ជាក់ពី Market Structure Shift (MSS) ទៅខាងលើ បន្ទាប់ពីស្រូបយក Sell-Side Liquidity នៅក្រោម $2,660។ សន្ទស្សន៍ IMR/RSI នៅកម្រិត 62.4 និងការរៀបជួរនៃ MA20 លើ MA50 បង្ហាញថារលកកើនឡើង (Bullish Expansion) កំពុងមានសន្ទុះខ្លាំង។
+            • <b>កត្តាបច្ចេកទេស៖</b> គូ XAU/USD កំពុងជួញដូរនៅតម្លៃ <b>${gold.spotOzUsd.toFixed(2)}/oz</b> ជាមួយចន្លោះ ២៤ ម៉ោង <b>${gold.low24hUsd.toFixed(2)} - ${gold.high24hUsd.toFixed(2)}</b>។ សន្ទស្សន៍ IMR/RSI (14) នៅកម្រិត <b>{rsi14}</b> និង MA20 នៅ <b>${ma20Val.toFixed(2)}</b> បង្ហាញពីសន្ទុះទីផ្សារបច្ចុប្បន្ន។
           </p>
           <p>
-            • <b>កត្តាម៉ាក្រូសេដ្ឋកិច្ច៖</b> ការបន្តទិញមាសបម្រុងរបស់ធនាគារកណ្តាល និងការថយចុះសម្ពាធនៃសន្ទស្សន៍ប្រាក់ដុល្លារ (DXY) គឺជាកាតាលីករជំរុញឱ្យតម្លៃមាសរក្សាភាពទាក់ទាញខ្ពស់។
+            • <b>កត្តាម៉ាក្រូសេដ្ឋកិច្ច៖</b> អត្រាប្ដូរប្រាក់ USD/KHR នៅ <b>{usdRate.toLocaleString()} ៛/$</b> រួមជាមួយតម្រូវការមាសបម្រុងសកល គឺជាកត្តាកំណត់តម្លៃមាសក្នុងស្រុក។
           </p>
           <p>
-            • <b>ការណែនាំសម្រាប់ទីផ្សារកម្ពុជា៖</b> សម្រាប់អ្នកសន្សំមាសជា <b>&quot;តម្លឹង&quot;</b> ឬ <b>&quot;ជី&quot;</b> តំបន់គាំទ្រសមស្របសម្រាប់ប្រមូលទិញបន្ថែមគឺរង្វង់ <b>$3,220 - $3,235</b> ក្នុងមួយតម្លឹង ឬប្រមាណ <b>13.1 - 13.2 លានរៀល</b>។
+            • <b>ការណែនាំសម្រាប់ទីផ្សារកម្ពុជា៖</b> សម្រាប់អ្នកសន្សំមាសជា <b>&quot;តម្លឹង&quot;</b> ឬ <b>&quot;ជី&quot;</b> តំបន់គាំទ្រសមស្របតាមទិន្នន័យ ២៤ ម៉ោងគឺរង្វង់ <b>${damlungSupportLow.toLocaleString()} - ${damlungSupportHigh.toLocaleString()}</b> ក្នុងមួយតម្លឹង ឬប្រមាណ <b>{damlungSupportMillionLow} - {damlungSupportMillionHigh} លានរៀល</b>។
           </p>
         </div>
 

@@ -4,25 +4,23 @@ import React, { useState } from 'react';
 import { FuelRates } from '@/lib/types';
 import {
   Fuel,
-  TrendingUp,
-  TrendingDown,
   Send,
-  Gauge,
   Car,
-  DollarSign,
-  Calendar,
   Building2,
   ShieldCheck,
-  CheckCircle,
-  HelpCircle,
   Activity,
   Bot,
   Loader2,
   Target,
   Newspaper,
-  Layers,
   Globe,
   Info,
+  Edit3,
+  RotateCcw,
+  Check,
+  X,
+  TrendingDown,
+  Award,
 } from 'lucide-react';
 import ChartComponent from './ChartComponent';
 import MarketNews from './MarketNews';
@@ -30,87 +28,99 @@ import MarketNews from './MarketNews';
 interface FuelTabProps {
   fuel: FuelRates;
   onSendTelegram: (text: string) => void;
+  onUpdateFuel?: React.Dispatch<React.SetStateAction<FuelRates>>;
 }
 
-export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
+export default function FuelTab({ fuel, onSendTelegram, onUpdateFuel }: FuelTabProps) {
   // Fuel Calculator State
   const [distanceKm, setDistanceKm] = useState<number>(150); // e.g. Phnom Penh to Kampot
   const [consumptionRate, setConsumptionRate] = useState<number>(7.5); // Liters per 100km
   const [selectedFuelType, setSelectedFuelType] = useState<'regular' | 'super' | 'diesel'>('regular');
-  const [selectedChartAsset, setSelectedChartAsset] = useState<'brent' | 'cambodia'>('brent');
+  const [selectedChartAsset, setSelectedChartAsset] = useState<'brent' | 'cambodia'>('cambodia');
+
+  // Manual Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [editForm, setEditForm] = useState({
+    regularKhr: fuel.cambodiaRetail.gasolineRegularKhr || 3700,
+    dieselKhr: fuel.cambodiaRetail.dieselKhr || 3500,
+    superKhr: fuel.cambodiaRetail.gasolineSuperKhr || 4200,
+    brentUsd: fuel.brentCrudeUsd || 73.01,
+    wtiUsd: fuel.wtiCrudeUsd || 70.5,
+    effectivePeriod:
+      fuel.cambodiaRetail.effectivePeriod || '២១ ដល់ ៣០ មេសា (សេចក្តីជូនដំណឹងក្រសួងពាណិជ្ជកម្ម)',
+  });
 
   // AI Analysis State
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiReport, setAiReport] = useState<string | null>(null);
 
-  // Domestic Gas Station Companies Table Data
+  // Domestic Gas Station Companies Table Data (synced with official MOC ceiling)
   const domesticCompanies = [
     {
       name: 'PTT Cambodia (ភីធីធី)',
       brand: 'PTT',
       badge: 'ស្តង់ដារថៃ',
-      superKhr: 4650,
-      regularKhr: 4150,
-      dieselKhr: 4000,
+      superKhr: fuel.cambodiaRetail.gasolineSuperKhr,
+      regularKhr: fuel.cambodiaRetail.gasolineRegularKhr,
+      dieselKhr: fuel.cambodiaRetail.dieselKhr,
       note: 'សាំង PTT Performa គុណភាពខ្ពស់',
     },
     {
       name: 'TotalEnergies Cambodia (តូតាល់)',
       brand: 'TotalEnergies',
       badge: 'ស្តង់ដារបារាំង',
-      superKhr: 4690,
-      regularKhr: 4150,
-      dieselKhr: 4050,
+      superKhr: fuel.cambodiaRetail.gasolineSuperKhr + 40,
+      regularKhr: fuel.cambodiaRetail.gasolineRegularKhr,
+      dieselKhr: fuel.cambodiaRetail.dieselKhr,
       note: 'Excellium Formula សន្សំសំចៃម៉ាស៊ីន',
     },
     {
       name: 'Tela Cambodia (តេលា)',
       brand: 'Tela',
       badge: 'ក្រុមហ៊ុនឈានមុខកម្ពុជា',
-      superKhr: 4650,
-      regularKhr: 4150,
-      dieselKhr: 4000,
+      superKhr: fuel.cambodiaRetail.gasolineSuperKhr,
+      regularKhr: fuel.cambodiaRetail.gasolineRegularKhr,
+      dieselKhr: fuel.cambodiaRetail.dieselKhr,
       note: 'បណ្តាញស្ថានីយច្រើនជាងគេទូទាំងប្រទេស',
     },
     {
-      name: 'Caltex (Chevron Cambodia)',
+      name: 'Caltex Cambodia (កាល់តិច)',
       brand: 'Caltex',
       badge: 'ស្តង់ដារអាមេរិក',
-      superKhr: 4680,
-      regularKhr: 4150,
-      dieselKhr: 4000,
+      superKhr: fuel.cambodiaRetail.gasolineSuperKhr + 30,
+      regularKhr: fuel.cambodiaRetail.gasolineRegularKhr,
+      dieselKhr: fuel.cambodiaRetail.dieselKhr,
       note: 'Techron Cleaning Technology',
     },
     {
       name: 'Sokimex Petroleum (សូគីម៉ិច)',
       brand: 'Sokimex',
       badge: 'ក្រុមហ៊ុនក្នុងស្រុក',
-      superKhr: 4620,
-      regularKhr: 4140,
-      dieselKhr: 3990,
+      superKhr: fuel.cambodiaRetail.gasolineSuperKhr - 20,
+      regularKhr: fuel.cambodiaRetail.gasolineRegularKhr - 10,
+      dieselKhr: fuel.cambodiaRetail.dieselKhr - 10,
       note: 'តម្លៃសមរម្យ តាមបណ្តាខេត្ត',
     },
     {
       name: 'Bright Petroleum (ប្រាយ)',
       brand: 'Bright',
       badge: 'តម្លៃសន្សំ',
-      superKhr: 4600,
-      regularKhr: 4130,
-      dieselKhr: 3980,
+      superKhr: fuel.cambodiaRetail.gasolineSuperKhr - 40,
+      regularKhr: fuel.cambodiaRetail.gasolineRegularKhr - 20,
+      dieselKhr: fuel.cambodiaRetail.dieselKhr - 20,
       note: 'តម្លៃលក់ប្រកួតប្រជែង',
     },
   ];
 
   // International Benchmarks
-  const brentBid = Math.round((fuel.brentCrudeUsd - 0.2) * 100) / 100;
+  const brentBid = Math.round((fuel.brentCrudeUsd - 0.25) * 100) / 100;
   const brentAsk = fuel.brentCrudeUsd;
-  const wtiBid = Math.round((fuel.wtiCrudeUsd - 0.2) * 100) / 100;
+  const wtiBid = Math.round((fuel.wtiCrudeUsd - 0.25) * 100) / 100;
   const wtiAsk = fuel.wtiCrudeUsd;
 
   // Wholesale / Import Estimate vs Retail Ceiling
-  const wholesaleRegularKhr = 3520;
-  const wholesaleDieselKhr = 3390;
-  const wholesaleSuperKhr = 3980;
+  const wholesaleRegularKhr = 3280;
+  const wholesaleDieselKhr = 3090;
 
   // Calculator
   const unitPriceKhr =
@@ -132,6 +142,72 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
   const totalTripCostUsd = totalLiters * unitPriceUsd;
   const costPerKmKhr = distanceKm > 0 ? totalTripCostKhr / distanceKm : 0;
 
+  // Save manual edit
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onUpdateFuel) {
+      const now = new Date();
+      const timeStr = `កែប្រែដោយដៃ ម៉ោង ${now.getHours().toString().padStart(2, '0')}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, '0')}`;
+      const reg = Number(editForm.regularKhr);
+      const die = Number(editForm.dieselKhr);
+      const sup = Number(editForm.superKhr);
+      const brent = Number(editForm.brentUsd);
+      const wti = Number(editForm.wtiUsd);
+
+      onUpdateFuel((prev) => ({
+        ...prev,
+        brentCrudeUsd: brent,
+        wtiCrudeUsd: wti,
+        cambodiaRetail: {
+          ...prev.cambodiaRetail,
+          gasolineRegularKhr: reg,
+          gasolineRegularUsd: Math.round((reg / 4069) * 100) / 100,
+          dieselKhr: die,
+          dieselUsd: Math.round((die / 4069) * 100) / 100,
+          gasolineSuperKhr: sup,
+          gasolineSuperUsd: Math.round((sup / 4069) * 100) / 100,
+          effectivePeriod: editForm.effectivePeriod,
+        },
+        lastUpdated: timeStr,
+      }));
+    }
+    setIsEditModalOpen(false);
+  };
+
+  const handleResetToOfficial = () => {
+    if (onUpdateFuel) {
+      onUpdateFuel((prev) => ({
+        ...prev,
+        brentCrudeUsd: 73.01,
+        wtiCrudeUsd: 70.5,
+        cambodiaRetail: {
+          gasolineRegularKhr: 3700,
+          gasolineRegularUsd: 0.91,
+          gasolineSuperKhr: 4200,
+          gasolineSuperUsd: 1.03,
+          dieselKhr: 3500,
+          dieselUsd: 0.86,
+          effectivePeriod: '២១ ដល់ ៣០ មេសា (សេចក្តីជូនដំណឹងក្រសួងពាណិជ្ជកម្ម)',
+          changeRegularKhr: -50,
+          changeDieselKhr: -50,
+        },
+        lastUpdated: 'សេចក្តីជូនដំណឹងផ្លូវការក្រសួងពាណិជ្ជកម្ម (ចុះថ្លៃ ៥០៛)',
+      }));
+      setEditForm({
+        regularKhr: 3700,
+        dieselKhr: 3500,
+        superKhr: 4200,
+        brentUsd: 73.01,
+        wtiUsd: 70.5,
+        effectivePeriod: '២១ ដល់ ៣០ មេសា (សេចក្តីជូនដំណឹងក្រសួងពាណិជ្ជកម្ម)',
+      });
+    }
+    setIsEditModalOpen(false);
+  };
+
   // Request AI Analysis from server
   const handleRequestAiAnalysis = async () => {
     setIsAiLoading(true);
@@ -151,7 +227,9 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
             wtiUsd: fuel.wtiCrudeUsd,
             cambodiaRegularKhr: fuel.cambodiaRetail.gasolineRegularKhr,
             cambodiaDieselKhr: fuel.cambodiaRetail.dieselKhr,
-            strategy: 'MOC Formula + OPEC+ Quota + IMS/RSI + MA (20,50,200)',
+            cambodiaSuperKhr: fuel.cambodiaRetail.gasolineSuperKhr,
+            effectivePeriod: fuel.cambodiaRetail.effectivePeriod,
+            strategy: 'MOC Bi-monthly Formula + Singapore MOPS ($73.01 / $80.42)',
           },
         }),
       });
@@ -159,7 +237,7 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
       if (data.analysisText) {
         setAiReport(data.analysisText);
       }
-    } catch (e: any) {
+    } catch {
       setAiReport('បរាជ័យក្នុងការទាញយកការវិភាគ AI សូមព្យាយាមម្តងទៀត');
     } finally {
       setIsAiLoading(false);
@@ -167,23 +245,24 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
   };
 
   const handleTelegramFuelReport = () => {
-    const text = `⛽ <b>របាយការណ៍ទីផ្សារប្រេងឥន្ធនៈពេញលេញ (Fuel Market Pulse)</b>
-📅 កាលបរិច្ឆេទកំណត់ដោយក្រសួងពាណិជ្ជកម្ម: ${fuel.cambodiaRetail.effectivePeriod}
+    const text = `⛽ <b>របាយការណ៍តម្លៃប្រេងឥន្ធនៈផ្លូវការ (MOC Fuel Report)</b>
+🏛️ ក្រសួងពាណិជ្ជកម្ម (Ministry of Commerce Cambodia)
+📅 សុពលភាពអនុវត្ត: <b>${fuel.cambodiaRetail.effectivePeriod}</b>
 
-🇰🇭 <b>១. តម្លៃប្រេងលក់រាយ និង ថ្លៃដើមនាំចូលនៅកម្ពុជា:</b>
-• សាំងធម្មតា EA92: <b>${fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛/L</b> ($${fuel.cambodiaRetail.gasolineRegularUsd}) [ថ្លៃដើម: ${wholesaleRegularKhr.toLocaleString()} ៛]
-• ម៉ាស៊ូត 50ppm (Diesel): <b>${fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛/L</b> ($${fuel.cambodiaRetail.dieselUsd}) [ថ្លៃដើម: ${wholesaleDieselKhr.toLocaleString()} ៛]
-• សាំងស៊ុបពែរ EA95: <b>${fuel.cambodiaRetail.gasolineSuperKhr.toLocaleString()} ៛/L</b> ($${fuel.cambodiaRetail.gasolineSuperUsd})
+🇰🇭 <b>១. តម្លៃលក់រាយនៅតាមស្ថានីយ (អនុវត្តទូទាំងប្រទេស):</b>
+• 🟢 <b>ប្រេងសាំងធម្មតា EA92:</b> <b>${fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛/លីត្រ</b> (ចុះថ្លៃ ៥០៛ / ~$${fuel.cambodiaRetail.gasolineRegularUsd})
+• 🔵 <b>ប្រេងម៉ាស៊ូត Gasoil 10ppm:</b> <b>${fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛/លីត្រ</b> (ចុះថ្លៃ ៥០៛ / ~$${fuel.cambodiaRetail.dieselUsd})
+• 🟡 <b>សាំងស៊ុបពែរ EA95:</b> <b>${fuel.cambodiaRetail.gasolineSuperKhr.toLocaleString()} ៛/លីត្រ</b> (~$${fuel.cambodiaRetail.gasolineSuperUsd})
 
-🌍 <b>២. តម្លៃប្រេងឆៅពិភពលោក (Global Crude Oil Benchmarks):</b>
-• Brent Crude: ទិញ <b>$${brentBid.toFixed(2)}</b> · លក់ <b>$${brentAsk.toFixed(2)}/bbl</b> (${fuel.brentChange24h >= 0 ? '+' : ''}${fuel.brentChange24h}%)
-• WTI Crude: ទិញ <b>$${wtiBid.toFixed(2)}</b> · លក់ <b>$${wtiAsk.toFixed(2)}/bbl</b>
-• Singapore MOPS 92: $84.20/bbl
+🌏 <b>២. តម្លៃមធ្យមភាគទីផ្សារអន្តរជាតិ (Singapore MOPS):</b>
+• សាំងធម្មតា Gasoline 92: <b>$73.0160/ធុង</b> ($0.4592/លីត្រ)
+• ប្រេងម៉ាស៊ូត Gasoil 10ppm: <b>$80.4200/ធុង</b> ($0.5058/លីត្រ)
+• ប្រេងឆៅ Brent Crude: <b>$${fuel.brentCrudeUsd.toFixed(2)}/bbl</b>
+• ប្រេងឆៅ WTI Crude: <b>$${fuel.wtiCrudeUsd.toFixed(2)}/bbl</b>
 
-🎯 <b>៣. សំយោគបច្ចេកទេស & ការព្យាករណ៍តម្លៃជុំបន្ទាប់:</b>
-• ការព្យាករណ៍ MOC ជុំបន្ទាប់: <b>ចុះ (BEARISH ថយចុះ ៣០ - ៥០ ៛)</b>
-• កម្រិតជឿជាក់: ៧២%
-• IMS / RSI: 48.2 (Neutral) · MA Trend: តម្លៃស្ថិតក្រោម MA50 ($75.40)`;
+🎯 <b>៣. សេចក្តីសង្ខេប:</b>
+• តម្លៃប្រេងសាំងធម្មតា និងប្រេងម៉ាស៊ូតបានចុះថ្លៃ ៥០៛ ក្នុងមួយលីត្រ
+• គ្រប់ស្ថានីយប្រេងឥន្ធនៈទូទាំងប្រទេសត្រូវលក់តាម ឬក្រោមតម្លៃពិដាននេះ`;
 
     onSendTelegram(text);
   };
@@ -196,210 +275,183 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
           <div className="flex items-center gap-2">
             <Fuel className="w-5 h-5 text-sky-400" />
             <h1 className="text-xl sm:text-2xl font-bold text-white">
-              ទំព័រតម្លៃប្រេង (Fuel Market: អន្តរជាតិ និង នៅកម្ពុជា)
+              ទំព័រតម្លៃប្រេង (Fuel Market: សេចក្តីជូនដំណឹងក្រសួងពាណិជ្ជកម្ម)
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            តម្លៃទិញ និង លក់ (ម៉ាស៊ូត & សាំង), ថ្លៃកំណត់របស់ក្រុមហ៊ុនក្នុងស្រុក និងក្រសួងពាណិជ្ជកម្ម (MOC), Trend + Strategy (MA & IMS), និងការព្យាករណ៍
+            តម្លៃលក់រាយប្រេងឥន្ធនៈនៅតាមស្ថានីយ (ក្រសួងពាណិជ្ជកម្ម) & តម្លៃអន្តរជាតិ Singapore MOPS
           </p>
         </div>
 
-        <button
-          onClick={handleTelegramFuelReport}
-          className="flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors shrink-0 shadow-sm shadow-sky-500/20"
-        >
-          <Send className="w-4 h-4" />
-          <span>ផ្ញើតម្លៃប្រេងទៅ Telegram</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onUpdateFuel && (
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+              <span>កែសម្រួលថ្លៃប្រេង</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleTelegramFuelReport}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors shrink-0 shadow-sm shadow-sky-500/20"
+          >
+            <Send className="w-4 h-4" />
+            <span>ផ្ញើតម្លៃប្រេងទៅ Telegram</span>
+          </button>
+        </div>
       </div>
 
-      {/* SECTION 1: Dual Buying & Selling Boards (Cambodia Retail & International Benchmarks) */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Fuel className="w-4 h-4 text-sky-400" />
-            <span>១. តារាងតម្លៃទិញចូល (ថ្លៃដើម) និង តម្លៃលក់ចេញ ម៉ាស៊ូត & សាំង (អន្តរជាតិ និង នៅខ្មែរ)</span>
-          </h2>
-          <span className="text-xs font-mono text-slate-400">
-            សុពលភាព: {fuel.cambodiaRetail.effectivePeriod}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Board: Cambodia Retail (MOC) */}
-          <div className="rounded-xl border border-sky-500/40 bg-slate-900/90 p-5 space-y-4 shadow-lg shadow-sky-500/5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-sky-400" />
-                តម្លៃប្រេងឥន្ធនៈនៅកម្ពុជា (Cambodia Retail & Wholesale)
-              </span>
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 font-bold border border-sky-500/20">
-                ពិដានកំណត់ដោយ MOC
-              </span>
+      {/* SECTION 1: Official MOC Announcement Board (Authentic Document Recreation from Screenshot 3) */}
+      <div className="rounded-2xl border border-sky-500/40 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 shadow-2xl space-y-6">
+        {/* Document Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg text-white font-bold text-lg">
+              🏛️
             </div>
-
-            {/* Gasoline Regular EA92 */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white">សាំងធម្មតា EA92 (Regular)</span>
-                <span className="text-xs font-mono text-slate-400">${fuel.cambodiaRetail.gasolineRegularUsd} /L</span>
+            <div>
+              <div className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span>ក្រសួងពាណិជ្ជកម្ម (Ministry of Commerce)</span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                  <div className="text-[11px] text-slate-400">ថ្លៃដើមនាំចូល/ទិញដុំ:</div>
-                  <div className="text-lg font-bold font-mono text-slate-300 tabular-nums">
-                    {wholesaleRegularKhr.toLocaleString()} ៛
-                  </div>
-                  <div className="text-[11px] text-slate-500">~$0.86 /L</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-sky-500/30">
-                  <div className="text-[11px] text-slate-400">តម្លៃលក់រាយពិដាន:</div>
-                  <div className="text-xl font-bold font-mono text-sky-300 tabular-nums">
-                    {fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛
-                  </div>
-                  <div className="text-[11px] text-sky-400 font-semibold">$1.02 /L</div>
-                </div>
+              <div className="text-xs text-sky-400 font-mono">
+                នាយកដ្ឋានអភិវឌ្ឍន៍ទីផ្សារឯកជន · ព្រះរាជាណាចក្រកម្ពុជា
               </div>
-            </div>
-
-            {/* Diesel 50ppm */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white">ប្រេងម៉ាស៊ូត 50ppm (Diesel)</span>
-                <span className="text-xs font-mono text-slate-400">${fuel.cambodiaRetail.dieselUsd} /L</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                  <div className="text-[11px] text-slate-400">ថ្លៃដើមនាំចូល/ទិញដុំ:</div>
-                  <div className="text-lg font-bold font-mono text-slate-300 tabular-nums">
-                    {wholesaleDieselKhr.toLocaleString()} ៛
-                  </div>
-                  <div className="text-[11px] text-slate-500">~$0.83 /L</div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-slate-900 border border-emerald-500/30">
-                  <div className="text-[11px] text-slate-400">តម្លៃលក់រាយពិដាន:</div>
-                  <div className="text-xl font-bold font-mono text-emerald-400 tabular-nums">
-                    {fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛
-                  </div>
-                  <div className="text-[11px] text-emerald-400 font-semibold">$0.98 /L</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Gasoline Super EA95 */}
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs font-mono">
-              <span className="font-sans text-slate-300">សាំងស៊ុបពែរ EA95:</span>
-              <span className="text-amber-300 font-bold tabular-nums">
-                {fuel.cambodiaRetail.gasolineSuperKhr.toLocaleString()} ៛/L (${fuel.cambodiaRetail.gasolineSuperUsd})
-              </span>
             </div>
           </div>
 
-          {/* Right Board: International Benchmarks (Brent, WTI, MOPS) */}
-          <div className="rounded-xl border border-amber-500/40 bg-slate-900/90 p-5 space-y-4 shadow-lg shadow-amber-500/5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-amber-400" />
-                តម្លៃប្រេងឆៅអន្តរជាតិ (International Benchmarks)
-              </span>
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-bold border border-amber-500/20">
-                USD / Barrel
-              </span>
-            </div>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-300">
+            <Award className="w-4 h-4 text-emerald-400" />
+            <span>សេចក្តីជូនដំណឹងផ្លូវការ (ចុះថ្លៃ ៥០រ)</span>
+          </div>
+        </div>
 
-            {/* Brent Crude Featured Box */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-3">
+        {/* Official Headline Notice */}
+        <div className="p-4 rounded-xl bg-slate-950/80 border border-sky-500/30 space-y-3">
+          <div className="text-sm sm:text-base font-bold text-white leading-relaxed">
+            សេចក្តីជូនដំណឹងស្តីពី៖ តម្លៃលក់រាយប្រេងឥន្ធនៈនៅតាមស្ថានីយ
+            ដែលត្រូវអនុវត្តចាប់ពីថ្ងៃទី២១ ដល់ថ្ងៃទី៣០
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            {/* Gasoline Regular */}
+            <div className="p-4 rounded-xl bg-slate-900 border border-emerald-500/40 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-white">ប្រេងឆៅ Brent Crude Oil (ICE Benchmark)</span>
-                <span
-                  className={`text-xs font-mono font-bold ${
-                    fuel.brentChange24h >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {fuel.brentChange24h >= 0 ? '+' : ''}{fuel.brentChange24h}%
+                <span className="text-xs text-slate-300 font-bold">ប្រេងសាំងធម្មតា (Gasoline 92)</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                  ចុះថ្លៃ ៥០៛
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                  <div className="text-xs text-slate-400">តម្លៃទិញចូល (Bid):</div>
-                  <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tabular-nums">
-                    ${brentBid.toFixed(2)}
-                  </div>
-                  <div className="text-[11px] text-slate-500">ក្នុង ១ បារ៉ែល</div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-900 border border-amber-500/30">
-                  <div className="text-xs text-slate-400">តម្លៃលក់ចេញ (Ask):</div>
-                  <div className="text-xl sm:text-2xl font-bold font-mono text-amber-300 tabular-nums">
-                    ${brentAsk.toFixed(2)}
-                  </div>
-                  <div className="text-[11px] text-amber-400 font-semibold">ក្នុង ១ បារ៉ែល</div>
-                </div>
+              <div className="text-3xl font-black font-mono text-emerald-400 tabular-nums">
+                {fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()}{' '}
+                <span className="text-base font-normal text-slate-400">រៀល/លីត្រ</span>
+              </div>
+              <div className="text-xs font-mono text-slate-400">
+                ~${fuel.cambodiaRetail.gasolineRegularUsd} USD/L (ថ្លៃពិដាន)
               </div>
             </div>
 
-            {/* WTI & MOPS Singapore */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                <div className="text-xs font-semibold text-slate-300">WTI Crude (សហរដ្ឋអាមេរិក)</div>
-                <div className="text-xs text-slate-400 font-mono">
-                  ទិញ: <span className="text-emerald-400 font-bold">${wtiBid.toFixed(2)}</span>
-                </div>
-                <div className="text-xs text-slate-400 font-mono">
-                  លក់: <span className="text-amber-300 font-bold">${wtiAsk.toFixed(2)}</span> /bbl
-                </div>
+            {/* Diesel */}
+            <div className="p-4 rounded-xl bg-slate-900 border border-sky-500/40 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300 font-bold">ប្រេងម៉ាស៊ូត (Gasoil 10ppm)</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">
+                  ចុះថ្លៃ ៥០៛
+                </span>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                <div className="text-xs font-semibold text-slate-300">MOPS Singapore (Platts)</div>
-                <div className="text-xs text-slate-400 font-mono">
-                  Mogas 92: <span className="text-sky-300 font-bold">$84.20</span>
-                </div>
-                <div className="text-xs text-slate-400 font-mono">
-                  Gasoil 10ppm: <span className="text-emerald-300 font-bold">$86.10</span>
-                </div>
+              <div className="text-3xl font-black font-mono text-sky-400 tabular-nums">
+                {fuel.cambodiaRetail.dieselKhr.toLocaleString()}{' '}
+                <span className="text-base font-normal text-slate-400">រៀល/លីត្រ</span>
+              </div>
+              <div className="text-xs font-mono text-slate-400">
+                ~${fuel.cambodiaRetail.dieselUsd} USD/L (ថ្លៃពិដាន)
               </div>
             </div>
+          </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-              <span className="font-sans">ខ្នាតគិត:</span>
-              <span className="text-slate-200">១ បារ៉ែល (Barrel) = ១៥៨.៩៨ លីត្រ</span>
-            </div>
+          <div className="flex items-center justify-between text-xs text-slate-400 pt-1 font-mono">
+            <span>សាំងស៊ុបពែរ EA95 (Super): <b className="text-amber-300">{fuel.cambodiaRetail.gasolineSuperKhr.toLocaleString()} ៛/L</b></span>
+            <span>សុពលភាព: <b className="text-white">{fuel.cambodiaRetail.effectivePeriod}</b></span>
+          </div>
+        </div>
+
+        {/* International MOPS Table from Screenshot */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-300">
+              តារាងថ្លៃលក់រាយប្រេងឥន្ធនៈនៅលើទីផ្សារអន្តរជាតិ (Singapore MOPS Platts / USD/Barrel)
+            </span>
+            <span className="text-sky-400 font-mono">Singapore Benchmarks</span>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-800">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-slate-950 text-slate-400 uppercase text-[11px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">កាលបរិច្ឆេទ (Date)</th>
+                  <th className="py-2.5 px-3 text-right">ប្រេងសាំងធម្មតា/ធុង (Gasoline 92)</th>
+                  <th className="py-2.5 px-3 text-right">ប្រេងម៉ាស៊ូត/ធុង (Gasoil 10ppm)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 bg-slate-900/60 tabular-nums">
+                <tr className="hover:bg-slate-800/40">
+                  <td className="py-2 px-3 text-slate-300">១១ មេសា</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$70.37/bbl</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$78.45/bbl</td>
+                </tr>
+                <tr className="hover:bg-slate-800/40">
+                  <td className="py-2 px-3 text-slate-300">១៤ មេសា</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$72.40/bbl</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$79.97/bbl</td>
+                </tr>
+                <tr className="hover:bg-slate-800/40">
+                  <td className="py-2 px-3 text-slate-300">១៥ មេសា</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$73.16/bbl</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$80.72/bbl</td>
+                </tr>
+                <tr className="hover:bg-slate-800/40">
+                  <td className="py-2 px-3 text-slate-300">១៦ មេសា</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$73.79/bbl</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$80.93/bbl</td>
+                </tr>
+                <tr className="hover:bg-slate-800/40">
+                  <td className="py-2 px-3 text-slate-300">១៧ មេសា</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$74.96/bbl</td>
+                  <td className="py-2 px-3 text-right text-slate-300">$81.93/bbl</td>
+                </tr>
+                <tr className="bg-slate-950 font-bold border-t border-slate-700">
+                  <td className="py-2.5 px-3 text-amber-300">មធ្យមភាគ ១៥ ថ្ងៃ (15-Day Average):</td>
+                  <td className="py-2.5 px-3 text-right text-emerald-400">$73.0160/bbl</td>
+                  <td className="py-2.5 px-3 text-right text-sky-400">$80.4200/bbl</td>
+                </tr>
+                <tr className="bg-slate-950 text-slate-300 border-t border-slate-800 font-semibold">
+                  <td className="py-2 px-3">មធ្យមភាគគិតជា (ដុល្លារ/លីត្រ):</td>
+                  <td className="py-2 px-3 text-right text-emerald-300">$0.4592 /L</td>
+                  <td className="py-2 px-3 text-right text-sky-300">$0.5058 /L</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      {/* SECTION 2: Domestic Oil Companies vs MOC Formula */}
+      {/* SECTION 2: Domestic Gas Stations Comparison Table */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Building2 className="w-5 h-5 text-sky-400" />
-              <span>២. ការកំណត់ថ្លៃលក់របស់ក្រុមហ៊ុនក្នុងស្រុក និង រូបមន្តក្រសួងពាណិជ្ជកម្ម (MOC)</span>
+              <span>២. តម្លៃលក់ជាក់ស្តែងតាមស្ថានីយក្នុងស្រុក (PTT, Total, Tela, Caltex, Sokimex)</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              ប្រៀបធៀបថ្លៃលក់ជាក់ស្តែងតាមស្ថានីយធំៗធៀបនឹងថ្លៃពិដានរបស់រាជរដ្ឋាភិបាល
+              ប្រៀបធៀបថ្លៃលក់តាមបណ្តាញស្ថានីយធំៗធៀបនឹងថ្លៃពិដានរបស់រាជរដ្ឋាភិបាល
             </p>
           </div>
           <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold">
-            ពិដាន MOC: ៤,១៥០៛ / ៤,០០០៛
+            ពិដាន MOC: {fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()}៛ /{' '}
+            {fuel.cambodiaRetail.dieselKhr.toLocaleString()}៛
           </span>
-        </div>
-
-        {/* MOC Formula Card */}
-        <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/30 text-xs text-slate-300 space-y-2">
-          <div className="flex items-center gap-2 text-sky-400 font-bold">
-            <Info className="w-4 h-4" />
-            <span>រូបមន្តកំណត់ថ្លៃលក់រាយរបស់ក្រសួងពាណិជ្ជកម្ម (MOC Bi-monthly Formula):</span>
-          </div>
-          <div className="p-2.5 rounded-lg bg-slate-900/80 font-mono text-[11px] text-amber-300 overflow-x-auto">
-            ថ្លៃលក់រាយ = [(ថ្លៃមធ្យម MOPS សិង្ហបុរី ១០ ថ្ងៃ + ថ្លៃដឹកជញ្ជូន និងធានារ៉ាប់រង Premium) × អត្រាប្ដូរប្រាក់] + ពន្ធគយ + អាករពិសេស + អាករ VAT 10% + ថ្លៃប្រតិបត្តិការ ($0.04/L) - ការឧបត្ថម្ភធន ($0.04/L)
-          </div>
-          <p className="text-[11px] text-slate-400">
-            * ក្រសួងពាណិជ្ជកម្មប្រកាសថ្លៃពិដានថ្មីរៀងរាល់ <b>១០ ថ្ងៃម្តង</b> (ថ្ងៃទី ០១, ១១, និង ២១ នៃខែនីមួយៗ)។ ស្ថានីយប្រេងឥន្ធនៈមិនត្រូវបានអនុញ្ញាតឱ្យលក់លើសថ្លៃពិដាននេះឡើយ ប៉ុន្តែអាចលក់ទាបជាងបាន។
-          </p>
         </div>
 
         {/* Domestic Companies Comparison Table */}
@@ -410,7 +462,7 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
                 <th className="py-3 px-4 font-sans">ក្រុមហ៊ុនប្រេងឥន្ធនៈ</th>
                 <th className="py-3 px-4 font-sans">ស្តង់ដារ</th>
                 <th className="py-3 px-4 text-right">សាំងធម្មតា EA92</th>
-                <th className="py-3 px-4 text-right">ម៉ាស៊ូត 50ppm</th>
+                <th className="py-3 px-4 text-right">ម៉ាស៊ូត 10ppm</th>
                 <th className="py-3 px-4 text-right">សាំងស៊ុបពែរ EA95</th>
                 <th className="py-3 px-4 font-sans">លក្ខណៈពិសេស</th>
               </tr>
@@ -442,7 +494,7 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
         </div>
       </div>
 
-      {/* SECTION 3: Trend + Strategy, IMS (RSI), Moving Averages (MA20, MA50, MA200) */}
+      {/* SECTION 3: Trend Chart */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -451,20 +503,22 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
           </h2>
           <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-900 border border-slate-800 text-xs">
             <button
+              onClick={() => setSelectedChartAsset('cambodia')}
+              className={`px-3 py-1 rounded transition-colors ${
+                selectedChartAsset === 'cambodia'
+                  ? 'bg-amber-500 text-slate-950 font-bold'
+                  : 'text-slate-400'
+              }`}
+            >
+              ប្រេងកម្ពុជា (៛/L)
+            </button>
+            <button
               onClick={() => setSelectedChartAsset('brent')}
               className={`px-3 py-1 rounded transition-colors ${
                 selectedChartAsset === 'brent' ? 'bg-sky-500 text-slate-950 font-bold' : 'text-slate-400'
               }`}
             >
               Brent Crude ($/bbl)
-            </button>
-            <button
-              onClick={() => setSelectedChartAsset('cambodia')}
-              className={`px-3 py-1 rounded transition-colors ${
-                selectedChartAsset === 'cambodia' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400'
-              }`}
-            >
-              ប្រេងកម្ពុជា (៛/L)
             </button>
           </div>
         </div>
@@ -489,7 +543,7 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
         )}
       </div>
 
-      {/* SECTION 4: Technical Synthesis, Forecast (ឡើង/ចុះ) & Gemini AI */}
+      {/* SECTION 4: Technical Synthesis & AI */}
       <div className="rounded-xl border border-sky-500/30 bg-slate-900/90 p-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
@@ -504,78 +558,67 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
             disabled={isAiLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 transition-colors disabled:opacity-50"
           >
-            {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-sky-400" />}
+            {isAiLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Bot className="w-3.5 h-3.5 text-sky-400" />
+            )}
             <span>{isAiLoading ? 'កំពុងសំយោគ...' : 'សុំការវិភាគបន្ថែមពី Gemini AI'}</span>
           </button>
         </div>
 
-        {/* Synthesis Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Card 1: Forecast Prediction */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-rose-500/40 space-y-1.5">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ការព្យាករណ៍តម្លៃ MOC ជុំបន្ទាប់</div>
-            <div className="text-xl sm:text-2xl font-black text-rose-400 flex items-center gap-1.5">
-              <TrendingDown className="w-6 h-6 text-rose-400" />
-              <span>ចុះ (BEARISH)</span>
+          <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-1.5">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              ស្ថានភាពតម្លៃ MOC
             </div>
-            <div className="text-xs font-mono text-rose-300">
-              រំពឹងថយចុះ: <b>៣០ - ៥០ ៛/L</b> (ជឿជាក់ ៧២%)
+            <div className="text-xl sm:text-2xl font-black text-emerald-400 flex items-center gap-1.5">
+              <TrendingDown className="w-6 h-6 text-emerald-400" />
+              <span>ចុះថ្លៃ ៥០៛</span>
+            </div>
+            <div className="text-xs font-mono text-emerald-300">
+              សាំងចុះ <b>៥០៛</b> · ម៉ាស៊ូតចុះ <b>៥០៛</b>
             </div>
             <div className="text-[11px] text-slate-400 font-sans mt-1">
-              តម្លៃមធ្យម MOPS សិង្ហបុរី ១០ ថ្ងៃមាននិន្នាការធ្លាក់បន្តិច
+              សាំង 3,700៛ / ម៉ាស៊ូត 3,500៛
             </div>
           </div>
 
-          {/* Card 2: Moving Averages (MA20, MA50, MA200) */}
           <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/30 space-y-1.5">
-            <div className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Moving Averages (Brent)</div>
-            <div className="text-sm font-bold text-white">ស្ថិតក្រោម MA50</div>
-            <div className="text-xs font-mono space-y-0.5 text-slate-300">
-              <div>MA20: <span className="text-sky-300 font-bold">$74.10</span></div>
-              <div>MA50: <span className="text-amber-300 font-bold">$75.40</span> (Resistance)</div>
-              <div>MA200: <span className="text-purple-300 font-bold">$78.80</span></div>
+            <div className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
+              Singapore MOPS 92
+            </div>
+            <div className="text-2xl font-bold font-mono text-sky-300">$73.01/bbl</div>
+            <div className="text-xs font-mono text-slate-300">
+              ម៉ាស៊ូត 10ppm: <span className="text-emerald-300 font-bold">$80.42/bbl</span>
             </div>
           </div>
 
-          {/* Card 3: IMS / RSI Indicator */}
           <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/30 space-y-1.5">
-            <div className="text-xs font-semibold text-purple-400 uppercase tracking-wider">សន្ទស្សន៍ IMS / RSI (14)</div>
-            <div className="text-2xl font-black font-mono text-purple-300 tabular-nums">
-              48.2
+            <div className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
+              សន្ទស្សន៍ IMS / RSI (14)
             </div>
-            <div className="text-xs text-purple-300 font-sans">
-              លំនឹងកណ្តាល (Neutral Momentum)
-            </div>
-            <div className="text-[11px] text-slate-400 font-sans">
-              កម្លាំងលក់ស្រាល (Bearish Tilt)
-            </div>
+            <div className="text-2xl font-black font-mono text-purple-300 tabular-nums">48.2</div>
+            <div className="text-xs text-purple-300 font-sans">ស្ថិរភាពល្អ (Cooling Down)</div>
+            <div className="text-[11px] text-slate-400 font-sans">តម្លៃធ្លាក់ចុះស្របទីផ្សារ</div>
           </div>
 
-          {/* Card 4: Strategy & Range */}
           <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-1.5 font-mono text-xs">
-            <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider font-sans">កម្រិតគន្លឹះ Brent Oil</div>
-            <div>Support (S1): <span className="text-emerald-400 font-bold">$71.50/bbl</span></div>
-            <div>Resistance (R1): <span className="text-rose-400 font-bold">$76.20/bbl</span></div>
-            <div>OPEC+ Quota: <span className="text-slate-300">កាត់បន្ថយ ២.២M bpd</span></div>
-            <div>US Crude Inventory: <span className="text-amber-300 font-bold">+1.8M bbl</span></div>
+            <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider font-sans">
+              កម្រិតគន្លឹះ Brent Oil
+            </div>
+            <div>
+              Support (S1): <span className="text-emerald-400 font-bold">$71.50/bbl</span>
+            </div>
+            <div>
+              Resistance (R1): <span className="text-rose-400 font-bold">$75.80/bbl</span>
+            </div>
+            <div>
+              OPEC+ គោលនយោបាយ: <span className="text-slate-300">ផ្គត់ផ្គង់មានតុល្យភាព</span>
+            </div>
           </div>
         </div>
 
-        {/* Synthesis Commentary */}
-        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2 leading-relaxed">
-          <div className="font-semibold text-sky-300 font-sans flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>ការសំយោគរួម (Executive Synthesis for Cambodia & Global Fuel):</span>
-          </div>
-          <p>
-            • <b>កត្តាតម្លៃប្រេងឆៅពិភពលោក (Global Market):</b> តម្លៃ Brent Crude ($74.45) កំពុងជួបនឹងកម្រិតរារាំង MA50 ($75.40)។ ទោះបីជា OPEC+ បានបន្តកាត់បន្ថយការផ្គត់ផ្គង់ក្តី ប៉ុន្តែកំណើនស្តុកប្រេងឆៅនៅសហរដ្ឋអាមេរិក និងតម្រូវការយឺតយ៉ាវនៅអឺរ៉ុប បានកំណត់មិនឱ្យតម្លៃហក់ឡើងខ្ពស់គំហុកឡើយ។
-          </p>
-          <p>
-            • <b>ការវាយតម្លៃសម្រាប់កម្ពុជា (MOC Retail Ceiling):</b> ដោយសារថ្លៃមធ្យម MOPS សិង្ហបុរីក្នុងជុំ ១០ ថ្ងៃនេះមានស្ថិរភាពថយចុះបន្តិចបន្តួច ការព្យាករណ៍បង្ហាញថាតម្លៃលក់រាយសាំង និងម៉ាស៊ូតនៅកម្ពុជាសម្រាប់ជុំបន្ទាប់អាចនឹង <b>ថយចុះប្រមាណ ៣០ ទៅ ៥០ រៀលក្នុងមួយលីត្រ</b>។
-          </p>
-        </div>
-
-        {/* Gemini AI Live Response Display if loaded */}
         {aiReport && (
           <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/50 space-y-2 text-xs text-slate-200">
             <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider font-mono">
@@ -623,14 +666,12 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
           </div>
 
           <div className="md:col-span-4 space-y-1.5">
-            <label className="text-xs font-medium text-slate-300">
-              ប្រភេទប្រេងដែលប្រើប្រាស់:
-            </label>
+            <label className="text-xs font-medium text-slate-300">ប្រភេទប្រេងដែលប្រើប្រាស់:</label>
             <div className="grid grid-cols-3 gap-1.5">
               {[
-                { id: 'regular', label: 'សាំងធម្មតា' },
-                { id: 'super', label: 'ស៊ុបពែរ' },
-                { id: 'diesel', label: 'ម៉ាស៊ូត' },
+                { id: 'regular', label: 'សាំងធម្មតា', price: fuel.cambodiaRetail.gasolineRegularKhr },
+                { id: 'super', label: 'ស៊ុបពែរ', price: fuel.cambodiaRetail.gasolineSuperKhr },
+                { id: 'diesel', label: 'ម៉ាស៊ូត', price: fuel.cambodiaRetail.dieselKhr },
               ].map((f) => (
                 <button
                   key={f.id}
@@ -641,7 +682,8 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  {f.label}
+                  <div>{f.label}</div>
+                  <div className="text-[10px] font-mono">{f.price.toLocaleString()}៛</div>
                 </button>
               ))}
             </div>
@@ -679,6 +721,142 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
         </div>
       </div>
 
+      {/* Manual Fuel Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-amber-400" />
+                <h3 className="font-bold text-white text-sm">
+                  កែសម្រួលថ្លៃប្រេងឥន្ធនៈ (Edit Fuel Prices)
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSaveEdit}
+              className="p-5 space-y-4 text-xs font-mono max-h-[75vh] overflow-y-auto"
+            >
+              <div>
+                <label className="block text-slate-300 font-sans mb-1 font-semibold">
+                  សាំងធម្មតា EA92 (៛/L):
+                </label>
+                <input
+                  type="number"
+                  value={editForm.regularKhr}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, regularKhr: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-sky-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-sans mb-1 font-semibold">
+                  ប្រេងម៉ាស៊ូត 10ppm (៛/L):
+                </label>
+                <input
+                  type="number"
+                  value={editForm.dieselKhr}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, dieselKhr: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-emerald-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-sans mb-1 font-semibold">
+                  សាំងស៊ុបពែរ EA95 (៛/L):
+                </label>
+                <input
+                  type="number"
+                  value={editForm.superKhr}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, superKhr: parseFloat(e.target.value) || 0 })
+                  }
+                  className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                <div>
+                  <span className="text-slate-300 font-sans font-semibold">Brent Crude ($/bbl):</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editForm.brentUsd}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, brentUsd: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 mt-1"
+                  />
+                </div>
+                <div>
+                  <span className="text-slate-300 font-sans font-semibold">WTI Crude ($/bbl):</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editForm.wtiUsd}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, wtiUsd: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-sans mb-1 font-semibold">
+                  កាលបរិច្ឆេទសុពលភាព:
+                </label>
+                <input
+                  type="text"
+                  value={editForm.effectivePeriod}
+                  onChange={(e) => setEditForm({ ...editForm, effectivePeriod: e.target.value })}
+                  className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800 font-sans">
+                <button
+                  type="button"
+                  onClick={handleResetToOfficial}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs text-slate-400 hover:text-white"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>កំណត់ឡើងវិញ (MOC)</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-3 py-2 text-xs text-slate-400 hover:text-white"
+                  >
+                    បោះបង់
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg text-xs"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>រក្សាទុក</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* SECTION 6: Fuel Market News Feed */}
       <div className="space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -686,14 +864,10 @@ export default function FuelTab({ fuel, onSendTelegram }: FuelTabProps) {
             <Newspaper className="w-4 h-4 text-sky-400" />
             <span>៦. ព័ត៌មានទីផ្សារប្រេងជាក់លាក់ (Fuel, OPEC+ & Geopolitics News)</span>
           </h2>
-          <span className="text-xs text-slate-400">OPEC+, តម្លៃប្រេងឆៅពិភពលោក និងក្រសួងពាណិជ្ជកម្ម</span>
+          <span className="text-xs text-slate-400">OPEC+, ស្តុកប្រេង EIA, មជ្ឈិមបូព៌ា និងក្រសួងពាណិជ្ជកម្ម</span>
         </div>
 
-        <MarketNews
-          onSendTelegram={onSendTelegram}
-          isWidgetMode={true}
-          defaultCategory="fuel"
-        />
+        <MarketNews onSendTelegram={onSendTelegram} isWidgetMode={true} defaultCategory="fuel" />
       </div>
     </div>
   );

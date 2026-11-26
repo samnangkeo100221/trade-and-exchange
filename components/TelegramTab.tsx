@@ -122,15 +122,17 @@ export default function TelegramTab({
 • មាសអន្តរជាតិ (Spot Gold): <b>$${gold.spotOzUsd.toFixed(2)}/oz</b> (${gold.change24hUsd >= 0 ? '+' : ''}${gold.change24hPercent}%)
 • មាសគីឡូ 99.99%: $${gold.gold24kBuyDamlung.toLocaleString()} / $${gold.gold24kSellDamlung.toLocaleString()}
 
-💵 <b>២. អត្រាប្ដូរប្រាក់ (Exchange Rates):</b>
-• USD / KHR: ទិញ ${currencies.usdKhrMarket.buy.toLocaleString()}៛ · លក់ <b>${currencies.usdKhrMarket.sell.toLocaleString()} ៛</b>
-• CNY / KHR: <b>${currencies.cnyKhr.rate.toFixed(2)} ៛ / ¥</b> (1$ ≈ ${currencies.cnyUsd.rate}¥)
-• THB / KHR: <b>${currencies.thbKhr.rate.toFixed(2)} ៛ / ฿</b>
+💵 <b>២. អត្រាប្ដូរប្រាក់ (ACLEDA Mobile):</b>
+• USD App (អេស៊ីលីដាអែប): ទិញ ${(currencies.acleda.buyAccount || 4055).toLocaleString()}៛ · លក់ <b>${(currencies.acleda.sellAccount || 4067).toLocaleString()} ៛</b>
+• USD Cash (សាច់ប្រាក់): ទិញ ${(currencies.acleda.buyCash || 4053).toLocaleString()}៛ · លក់ <b>${(currencies.acleda.sellCash || 4069).toLocaleString()} ៛</b>
+• VND (ដុងវៀតណាម): <b>${currencies.vndKhr?.perVndSell || 0.1570} ៛</b> (១០k ដុង = ${currencies.vndKhr?.sellCash || 1570}៛)
+• CNY (យ៉ន់): <b>${currencies.cnyKhr.rate.toFixed(1)} ៛</b> · THB (បាត): <b>${currencies.thbKhr.rate.toFixed(1)} ៛</b>
 
-⛽ <b>៣. តម្លៃប្រេងឥន្ធនៈ (Fuel Prices):</b>
+⛽ <b>៣. តម្លៃប្រេងឥន្ធនៈ (ក្រសួងពាណិជ្ជកម្ម ចុះ ៥០៛):</b>
 • សាំងធម្មតា EA92: <b>${fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛/L</b> ($${fuel.cambodiaRetail.gasolineRegularUsd})
-• ម៉ាស៊ូត 50ppm: <b>${fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛/L</b> ($${fuel.cambodiaRetail.dieselUsd})
-• Brent Crude: <b>$${fuel.brentCrudeUsd.toFixed(2)}/bbl</b>
+• ម៉ាស៊ូត Gasoil 10ppm: <b>${fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛/L</b> ($${fuel.cambodiaRetail.dieselUsd})
+• សាំងស៊ុបពែរ EA95: <b>${fuel.cambodiaRetail.gasolineSuperKhr.toLocaleString()} ៛/L</b>
+• Singapore MOPS 92: <b>$73.0160/bbl</b> · Brent: <b>$${fuel.brentCrudeUsd.toFixed(2)}/bbl</b>
 
 🎯 <b>៤. យុទ្ធសាស្ត្រ ICT:</b>
 • និន្នាការមាស: <b>${ict.biasKhmer}</b>

@@ -64,45 +64,45 @@ export const INITIAL_NEWS_ITEMS: MarketNewsItem[] = [
   },
   {
     id: 'news-4',
-    title: 'ក្រសួងពាណិជ្ជកម្មប្រកាសតម្លៃប្រេងឥន្ធនៈលក់រាយជុំថ្មី៖ សាំងធម្មតា ៤,១៥០ ៛ និងម៉ាស៊ូត ៤,០០០ ៛',
-    titleEnglish: 'Cambodia Ministry of Commerce Issues Updated Fuel Ceiling: Regular 4,150 KHR, Diesel 4,000 KHR',
+    title: 'ក្រសួងពាណិជ្ជកម្មប្រកាសតម្លៃប្រេងឥន្ធនៈលក់រាយជុំថ្មី៖ សាំងធម្មតា ៤,០៥០ ៛ និងម៉ាស៊ូត ៤,៩០០ ៛',
+    titleEnglish: 'Cambodia Ministry of Commerce Issues Updated Fuel Ceiling: Regular 4,050 KHR, Diesel 4,900 KHR',
     category: 'fuel',
     source: 'ក្រសួងពាណិជ្ជកម្ម (MOC Cambodia)',
     timestamp: STATIC_BASE_TIMESTAMP - 140 * 60 * 1000, // 2h 20m ago
     timeAgo: '២ ម៉ោងមុន',
-    summary: 'យោងតាមរូបមន្តគណនាតម្លៃប្រេងឥន្ធនៈលក់រាយផ្អែកលើទីផ្សារសិង្ហបុរី (MOPS) តម្លៃសាំងធម្មតានិងម៉ាស៊ូតនៅកម្ពុជាបានចុះបន្តិច ជួយសម្រាលការចំណាយរបស់អ្នកធ្វើដំណើរ។',
-    content: `ក្រសួងពាណិជ្ជកម្មកម្ពុជាបានចេញសេចក្តីប្រកាសព័ត៌មានស្តីពីតម្លៃលក់រាយប្រេងឥន្ធនៈនៅតាមស្ថានីយទូទាំងប្រទេសសម្រាប់ជុំថ្មី (មានសុពលភាព ១០ ថ្ងៃ) ដោយតម្លៃមានការថយចុះ ៥០ រៀលក្នុងមួយលីត្រ៖
-• សាំងធម្មតា EA92៖ ៤,១៥០ រៀល/លីត្រ (~$1.02)
-• សាំងស៊ុបពែរ EA95៖ ៤,៦៥០ រៀល/លីត្រ (~$1.15)
-• ម៉ាស៊ូត 50ppm៖ ៤,០០០ រៀល/លីត្រ (~$0.98)
+    summary: 'យោងតាមសេចក្តីជូនដំណឹងរបស់ក្រសួងពាណិជ្ជកម្ម តម្លៃប្រេងឥន្ធនៈលក់រាយចាប់ពីថ្ងៃទី២១ វិច្ឆិកា ដល់ថ្ងៃទី០១ ធ្នូ មានការបញ្ចុះតម្លៃ ដោយសាំងធម្មតាចុះ ៣០០៛ និងម៉ាស៊ូតចុះ ៤០០៛។',
+    content: `ក្រសួងពាណិជ្ជកម្មកម្ពុជាបានចេញសេចក្តីប្រកាសព័ត៌មានស្តីពីតម្លៃលក់រាយប្រេងឥន្ធនៈនៅតាមស្ថានីយទូទាំងប្រទេសសម្រាប់ជុំថ្មី (មានសុពលភាព ១០ ថ្ងៃ) ដោយតម្លៃមានការថយចុះ៖
+• សាំងធម្មតា EA92៖ ៤,០៥០ រៀល/លីត្រ (~$1.00) [ចុះថ្លៃ ៣០០ ៛]
+• សាំងស៊ុបពែរ EA95៖ ៤,៦៥០ រៀល/លីត្រ (~$1.14)
+• ម៉ាស៊ូត 10ppm៖ ៤,៩០០ រៀល/លីត្រ (~$1.21) [ចុះថ្លៃ ៤០០ ៛]
 
-ការប្រែប្រួលនេះបណ្តាលមកពីតម្លៃប្រេងឆៅពិភពលោក (Brent Crude) ជួញដូរក្នុងរង្វង់ $74 ក្នុងមួយបារ៉ែល គួបផ្សំនឹងការសម្របសម្រួលពន្ធគយពីរាជរដ្ឋាភិបាលកម្ពុជាដើម្បីរក្សាស្ថិរភាពជីវភាពពលរដ្ឋ។`,
+ការប្រែប្រួលនេះបណ្តាលមកពីតម្លៃប្រេងឆៅពិភពលោក (Brent Crude) ជួញដូរក្នុងរង្វង់ $90-$91 ក្នុងមួយបារ៉ែល គួបផ្សំនឹងការសម្របសម្រួលពន្ធគយពីរាជរដ្ឋាភិបាលកម្ពុជាដើម្បីរក្សាស្ថិរភាពជីវភាពពលរដ្ឋ។`,
     impact: 'BEARISH',
     relatedAsset: 'ប្រេងឥន្ធនៈកម្ពុជា · Brent Oil',
     keyTakeaways: [
-      'តម្លៃប្រេងឥន្ធនៈលក់រាយនៅកម្ពុជាចុះ ៥០ ៛ ក្នុងមួយលីត្រ',
-      'សាំងធម្មតា ៤,១៥០ ៛/L · ម៉ាស៊ូត ៤,០០០ ៛/L',
-      'ផ្អែកលើការប្រែប្រួលទីផ្សារប្រេងឆៅ Brent ($74.45/bbl)',
+      'តម្លៃប្រេងឥន្ធនៈលក់រាយនៅកម្ពុជាចុះ ៣០០-៤០០ ៛ ក្នុងមួយលីត្រ',
+      'សាំងធម្មតា ៤,០៥០ ៛/L · ម៉ាស៊ូត ៤,៩០០ ៛/L',
+      'សុពលភាព៖ ២១ វិច្ឆិកា ដល់ ០១ ធ្នូ ២០២៦',
     ],
   },
   {
     id: 'news-5',
-    title: 'ការវិភាគបច្ចេកទេស ICT៖ XAU/USD បង្កើត Bullish Order Flow ត្រៀមទម្លុះ BSL $2,710',
+    title: 'ការវិភាគបច្ចេកទេស ICT៖ XAU/USD បង្កើត Bullish Order Flow ត្រៀមទម្លុះ BSL $3,620',
     titleEnglish: 'ICT Technical View: Gold XAU/USD Confirms Bullish Order Flow After Liquidity Sweep',
     category: 'macro',
     source: 'FXStreet & ICT Analytics',
     timestamp: STATIC_BASE_TIMESTAMP - 210 * 60 * 1000, // 3h 30m ago
     timeAgo: '៣ ម៉ោងមុន',
-    summary: 'យុទ្ធសាស្ត្រ ICT បង្ហាញថា Smart Money បាន sweep យក Sell-Side Liquidity (SSL) នៅក្រោម $2,660 រួចបង្កើត Market Structure Shift (MSS) យ៉ាងរឹងមាំទៅលើ។',
-    content: `នៅក្នុងក្របខណ្ឌយុទ្ធសាស្ត្រ Inner Circle Trader (ICT) គូជួញដូរមាសអន្តរជាតិ XAU/USD កំពុងស្ថិតក្នុងរលកកើនឡើង (Bullish Expansion Phase)។ ទៀន 4-Hour បានបង្កើត Break of Structure (BOS) យ៉ាងច្បាស់លាស់នៅកម្រិត $2,682។
+    summary: 'យុទ្ធសាស្ត្រ ICT បង្ហាញថា Smart Money បាន sweep យក Sell-Side Liquidity (SSL) នៅក្រោម $3,520 រួចបង្កើត Market Structure Shift (MSS) យ៉ាងរឹងមាំទៅលើ។',
+    content: `នៅក្នុងក្របខណ្ឌយុទ្ធសាស្ត្រ Inner Circle Trader (ICT) គូជួញដូរមាសអន្តរជាតិ XAU/USD កំពុងស្ថិតក្នុងរលកកើនឡើង (Bullish Expansion Phase)។ ទៀន 4-Hour បានបង្កើត Break of Structure (BOS) យ៉ាងច្បាស់លាស់នៅកម្រិត $3,560។
 
-តំបន់ Discount Fair Value Gap (FVG) ចន្លោះ $2,677 - $2,683 ត្រូវបានចាត់ទុកជាតំបន់រង់ចាំទិញ (Optimal Trade Entry - OTE) ដ៏ល្អបំផុត។ គោលដៅដេញថ្លៃបន្ទាប់គឺ Buy-Side Liquidity (BSL) នៅតំបន់ Equal Highs $2,710 - $2,715។ កម្រិតការពារហានិភ័យ (Stop Loss) គួរដាក់នៅក្រោម Bullish Order Block $2,663.50។`,
+តំបន់ Discount Fair Value Gap (FVG) ចន្លោះ $3,568 - $3,575 ត្រូវបានចាត់ទុកជាតំបន់រង់ចាំទិញ (Optimal Trade Entry - OTE) ដ៏ល្អបំផុត។ គោលដៅដេញថ្លៃបន្ទាប់គឺ Buy-Side Liquidity (BSL) នៅតំបន់ Equal Highs $3,620+។`,
     impact: 'BULLISH',
     relatedAsset: 'XAU/USD · ICT Strategy',
     keyTakeaways: [
       'Market Bias: ឡើង (Bullish) តាម ICT Framework',
-      'តំបន់ OTE Entry Discount: $2,674 - $2,679',
-      'គោលដៅដេញថ្លៃ Liquidity: BSL $2,710+',
+      'តំបន់ OTE Entry Discount: $3,565 - $3,572',
+      'គោលដៅដេញថ្លៃ Liquidity: BSL $3,620+',
     ],
   },
   {

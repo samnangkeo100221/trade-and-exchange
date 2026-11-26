@@ -50,16 +50,22 @@ export default function AutoAlertMonitor({
   const [alertLogs, setAlertLogs] = useState<AutoAlertLog[]>([]);
   const [toastText, setToastText] = useState<string | null>(null);
 
-  // Baselines for alert trigger calculation (State for display, Ref for synchronous delta checking)
-  const [lastAlertedGold, setLastAlertedGold] = useState<number>(2688.40);
-  const [lastAlertedAcleda, setLastAlertedAcleda] = useState<number>(4077);
-  const [lastAlertedFuelRegular, setLastAlertedFuelRegular] = useState<number>(4150);
-  const [lastAlertedFuelDiesel, setLastAlertedFuelDiesel] = useState<number>(4000);
+  const initialAcleda = currencies.acleda?.sellCash || currencies.usdKhrMarket.sell;
 
-  const lastGoldRef = useRef<number>(2688.40);
-  const lastAcledaRef = useRef<number>(4077);
-  const lastFuelRegularRef = useRef<number>(4150);
-  const lastFuelDieselRef = useRef<number>(4000);
+  // Baselines for alert trigger calculation (State for display, Ref for synchronous delta checking)
+  const [lastAlertedGold, setLastAlertedGold] = useState<number>(gold.spotOzUsd);
+  const [lastAlertedAcleda, setLastAlertedAcleda] = useState<number>(initialAcleda);
+  const [lastAlertedFuelRegular, setLastAlertedFuelRegular] = useState<number>(
+    fuel.cambodiaRetail.gasolineRegularKhr
+  );
+  const [lastAlertedFuelDiesel, setLastAlertedFuelDiesel] = useState<number>(
+    fuel.cambodiaRetail.dieselKhr
+  );
+
+  const lastGoldRef = useRef<number>(gold.spotOzUsd);
+  const lastAcledaRef = useRef<number>(initialAcleda);
+  const lastFuelRegularRef = useRef<number>(fuel.cambodiaRetail.gasolineRegularKhr);
+  const lastFuelDieselRef = useRef<number>(fuel.cambodiaRetail.dieselKhr);
 
   const showToast = useCallback((msg: string) => {
     setToastText(msg);

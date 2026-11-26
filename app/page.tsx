@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActiveTab,
   GoldPrice,
@@ -68,136 +68,191 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Modal State
+  // Modal & Live Fetch State
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState<boolean>(false);
   const [modalDefaultMsg, setModalDefaultMsg] = useState<string>('');
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(true);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [isServerTelegramConfigured, setIsServerTelegramConfigured] = useState<boolean>(false);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
+  const triggerToast = useCallback((msg: string) => {
     setToastNotification(msg);
     setTimeout(() => setToastNotification(null), 3000);
-  };
+  }, []);
 
-  // Quick refresh: fetch from live endpoint /api/market/live with fallback
-  const handleRefreshData = async () => {
-    setIsRefreshing(true);
-    const now = new Date();
-    const timeStr = `ថ្ងៃនេះ ម៉ោង ${now.getHours().toString().padStart(2, '0')}:${now
-      .getMinutes()
-      .toString()
-      .padStart(2, '0')}`;
+  // Fetch real-time market data from /api/market/live
+  const fetchLiveMarket = useCallback(
+    async (showToastOnSuccess = false) => {
+      setIsRefreshing(true);
+      setLiveError(null);
+      const now = new Date();
+      const timeStr = `ថ្ងៃនេះ ម៉ោង ${now.getHours().toString().padStart(2, '0')}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, '0')}`;
 
-    try {
-      const res = await fetch('/api/market/live');
-      if (res.ok) {
+      try {
+        const res = await fetch('/api/market/live', { cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
         const data = await res.json();
-        if (data && data.success) {
-          const spotOz = data.gold.spotOzUsd;
-          const damlungUsd = data.gold.damlungUsd;
-          const damlungKhr = data.gold.damlungKhr;
-          const chiKhr = data.gold.chiKhr;
-          const hunKhr = data.gold.hunKhr;
-          const acledaData = data.acleda;
-          const fuelData = data.fuel;
+        if (!data || !data.success) {
+          throw new Error(data?.error || 'ទិន្នន័យមិនត្រឹមត្រូវ');
+        }
 
-          // Update Gold
-          setGold((prev) => ({
+        const spotOz = data.gold.spotOzUsd;
+        const damlungUsd = data.gold.damlungUsd;
+        const damlungKhr = data.gold.damlungKhr;
+        const chiUsd = data.gold.chiUsd ?? Math.round((damlungUsd / 10) * 100) / 100;
+        const chiKhr = data.gold.chiKhr;
+        const hunUsd = data.gold.hunUsd ?? Math.round((damlungUsd / 100) * 100) / 100;
+        const hunKhr = data.gold.hunKhr;
+        const acledaData = data.acleda;
+        const fuelData = data.fuel;
+        const fxRate = acledaData?.sellCash || 4069;
+
+        const gramUsd = Math.round((spotOz / GRAMS_PER_TROY_OZ) * 100) / 100;
+        const gramKhr = Math.round(gramUsd * fxRate);
+        const gold24kBuy = Math.round((damlungUsd - 12) * 100) / 100;
+        const gold24kSell = Math.round((damlungUsd + 15) * 100) / 100;
+        const gold18kBuy = Math.round(damlungUsd * 0.75 * 100) / 100;
+        const gold18kSell = Math.round((damlungUsd * 0.75 + 25) * 100) / 100;
+
+        setGold((prev) => ({
+          ...prev,
+          spotOzUsd: spotOz,
+          spotOzKhr: Math.round(spotOz * fxRate),
+          prevCloseUsd: data.gold.prevCloseUsd ?? prev.prevCloseUsd,
+          change24hUsd: data.gold.change24hUsd ?? prev.change24hUsd,
+          change24hPercent: data.gold.change24hPercent ?? prev.change24hPercent,
+          high24hUsd: data.gold.high24hUsd ?? prev.high24hUsd,
+          low24hUsd: data.gold.low24hUsd ?? prev.low24hUsd,
+          history24h: Array.isArray(data.gold.history24h) ? data.gold.history24h : prev.history24h,
+          source: data.gold.source ?? prev.source,
+          damlungUsd,
+          damlungKhr,
+          chiUsd,
+          chiKhr,
+          hunUsd,
+          hunKhr,
+          gramUsd,
+          gramKhr,
+          gold24kBuyDamlung: gold24kBuy,
+          gold24kSellDamlung: gold24kSell,
+          goldKilobarBuyKhr: Math.round(gold24kBuy * fxRate),
+          goldKilobarSellKhr: Math.round(gold24kSell * fxRate),
+          gold18kBuyDamlung: gold18kBuy,
+          gold18kSellDamlung: gold18kSell,
+          gold18kBuyKhr: Math.round(gold18kBuy * fxRate),
+          gold18kSellKhr: Math.round(gold18kSell * fxRate),
+          lastUpdated: timeStr,
+        }));
+
+        if (data.currencies && acledaData) {
+          setCurrencies((prev) => ({
             ...prev,
-            spotOzUsd: spotOz,
-            spotOzKhr: Math.round(spotOz * (acledaData?.sellCash || 4077)),
-            damlungUsd,
-            damlungKhr,
-            chiUsd: Math.round((damlungUsd / 10) * 100) / 100,
-            chiKhr,
-            hunUsd: Math.round((damlungUsd / 100) * 100) / 100,
-            hunKhr,
-            gold24kBuyDamlung: Math.round((damlungUsd - 12) * 100) / 100,
-            gold24kSellDamlung: Math.round((damlungUsd + 15) * 100) / 100,
+            acleda: {
+              bankName: acledaData.bankName,
+              buyCash: acledaData.buyCash,
+              sellCash: acledaData.sellCash,
+              buyAccount: acledaData.buyAccount,
+              sellAccount: acledaData.sellAccount,
+              change24h: data.currencies.usdKhrMarket.change24h,
+              source: acledaData.source,
+              confidence: acledaData.confidence,
+            },
+            usdKhrMarket: data.currencies.usdKhrMarket,
+            usdKhrNbc: data.currencies.usdKhrNbc,
+            cnyKhr: data.currencies.cnyKhr,
+            cnyUsd: data.currencies.cnyUsd,
+            thbKhr: data.currencies.thbKhr,
+            eurKhr: data.currencies.eurKhr,
+            vndKhr: data.currencies.vndKhr,
+            lakKhr: data.currencies.lakKhr,
+            audKhr: data.currencies.audKhr,
             lastUpdated: timeStr,
           }));
-
-          // Update Currencies
-          if (acledaData) {
-            setCurrencies((prev) => ({
-              ...prev,
-              acleda: {
-                bankName: acledaData.bankName,
-                currency: acledaData.currency,
-                buyCash: acledaData.buyCash,
-                sellCash: acledaData.sellCash,
-                buyAccount: acledaData.buyAccount,
-                sellAccount: acledaData.sellAccount,
-                change24h: acledaData.sellCash - prev.usdKhrMarket.sell,
-                source: acledaData.source,
-                confidence: acledaData.confidence,
-              },
-              usdKhrMarket: {
-                buy: acledaData.buyCash,
-                sell: acledaData.sellCash,
-                change24h: acledaData.sellCash - prev.usdKhrMarket.sell,
-              },
-              lastUpdated: timeStr,
-            }));
-          }
-
-          // Update Fuel
-          if (fuelData) {
-            setFuel((prev) => ({
-              ...prev,
-              brentCrudeUsd: fuelData.brentCrudeUsd,
-              cambodiaRetail: {
-                ...prev.cambodiaRetail,
-                gasolineRegularKhr: fuelData.gasolineRegularKhr,
-                dieselKhr: fuelData.dieselKhr,
-                gasolineSuperKhr: fuelData.gasolineSuperKhr,
-              },
-              lastUpdated: timeStr,
-            }));
-          }
-
-          // Update ICT current price
-          setIct((prev) => ({
-            ...prev,
-            currentPrice: spotOz,
-          }));
-
-          triggerToast('បានទាញយកទិន្នន័យផ្ទាល់ពី Forex & ACLEDA ជោគជ័យ!');
-          setIsRefreshing(false);
-          return;
         }
+
+        if (fuelData) {
+          setFuel((prev) => ({
+            ...prev,
+            brentCrudeUsd: fuelData.brentCrudeUsd || prev.brentCrudeUsd,
+            wtiCrudeUsd: fuelData.wtiCrudeUsd || prev.wtiCrudeUsd,
+            brentChange24h:
+              typeof fuelData.brentChange24h === 'number'
+                ? fuelData.brentChange24h
+                : prev.brentChange24h,
+            wtiChange24h:
+              typeof fuelData.wtiChange24h === 'number'
+                ? fuelData.wtiChange24h
+                : prev.wtiChange24h,
+            cambodiaRetail: {
+              ...prev.cambodiaRetail,
+              gasolineRegularKhr: fuelData.gasolineRegularKhr,
+              gasolineRegularUsd: Math.round((fuelData.gasolineRegularKhr / fxRate) * 100) / 100,
+              dieselKhr: fuelData.dieselKhr,
+              dieselUsd: Math.round((fuelData.dieselKhr / fxRate) * 100) / 100,
+              gasolineSuperKhr: fuelData.gasolineSuperKhr,
+              gasolineSuperUsd: Math.round((fuelData.gasolineSuperKhr / fxRate) * 100) / 100,
+              effectivePeriod: fuelData.effectivePeriod || prev.cambodiaRetail.effectivePeriod,
+            },
+            lastUpdated: timeStr,
+          }));
+        }
+
+        setIct((prev) => ({
+          ...prev,
+          currentPrice: spotOz,
+        }));
+
+        if (showToastOnSuccess) {
+          triggerToast('បានទាញយកទិន្នន័យផ្ទាល់ (Real-Time) ជោគជ័យ!');
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'មិនអាចតភ្ជាប់ទិន្នន័យផ្ទាល់បានទេ';
+        setLiveError(msg);
+        if (showToastOnSuccess) {
+          triggerToast(`បរាជ័យក្នុងការទាញយកទិន្នន័យផ្ទាល់: ${msg}`);
+        }
+      } finally {
+        setIsRefreshing(false);
       }
-    } catch (e) {
-      console.warn('API fetch fallback to local compute:', e);
-    }
+    },
+    [triggerToast]
+  );
 
-    // Jiggle fallback
-    const goldShift = Math.round((Math.random() * 4 - 1.8) * 100) / 100;
-    const newSpotOz = Math.round((gold.spotOzUsd + goldShift) * 100) / 100;
-    const usdRate = currencies.acleda?.sellCash || currencies.usdKhrMarket.sell;
-    const newDamlungUsd = Math.round(newSpotOz * DAMLUNG_TO_TROY_OZ * 100) / 100;
-    const newDamlungKhr = Math.round(newDamlungUsd * usdRate);
+  // Automatic real-time fetch on mount + 60s live polling + Telegram server check
+  useEffect(() => {
+    const initialTimer = setTimeout(() => {
+      fetchLiveMarket(false);
+    }, 0);
 
-    setGold((prev) => ({
-      ...prev,
-      spotOzUsd: newSpotOz,
-      spotOzKhr: Math.round(newSpotOz * usdRate),
-      damlungUsd: newDamlungUsd,
-      damlungKhr: newDamlungKhr,
-      chiUsd: Math.round((newDamlungUsd / 10) * 100) / 100,
-      chiKhr: Math.round(newDamlungKhr / 10),
-      hunUsd: Math.round((newDamlungUsd / 100) * 100) / 100,
-      hunKhr: Math.round(newDamlungKhr / 100),
-      lastUpdated: timeStr,
-    }));
+    fetch('/api/telegram/send')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((info) => {
+        if (info?.serverConfigured) {
+          setIsServerTelegramConfigured(true);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
 
-    setIct((prev) => ({
-      ...prev,
-      currentPrice: newSpotOz,
-    }));
+    const interval = setInterval(() => {
+      fetchLiveMarket(false);
+    }, 60000);
 
-    setIsRefreshing(false);
-    triggerToast('បានធ្វើបច្ចុប្បន្នភាពទិន្នន័យទីផ្សារជោគជ័យ');
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [fetchLiveMarket]);
+
+  const handleRefreshData = () => {
+    fetchLiveMarket(true);
   };
 
   // Snapshot trigger
@@ -209,7 +264,8 @@ export default function HomePage() {
 
   // Telegram Sender Function
   const handleSendTelegram = async (messageText: string): Promise<boolean> => {
-    if (!telegramConfig.botToken || !telegramConfig.chatId) {
+    const hasClientCreds = Boolean(telegramConfig.botToken && telegramConfig.chatId);
+    if (!hasClientCreds && !isServerTelegramConfigured) {
       setModalDefaultMsg(messageText);
       setIsTelegramModalOpen(true);
       return false;
@@ -220,8 +276,8 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          botToken: telegramConfig.botToken,
-          chatId: telegramConfig.chatId,
+          botToken: telegramConfig.botToken || undefined,
+          chatId: telegramConfig.chatId || undefined,
           message: messageText,
         }),
       });
@@ -233,8 +289,9 @@ export default function HomePage() {
 
       triggerToast('បានផ្ញើសារទៅកាន់ Telegram ជោគជ័យ!');
       return true;
-    } catch (err: any) {
-      triggerToast(`កំហុស Telegram: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'កំហុសមិនស្គាល់';
+      triggerToast(`កំហុស Telegram: ${msg}`);
       return false;
     }
   };
@@ -249,14 +306,16 @@ export default function HomePage() {
 • ១ ជី (Chi): <b>${gold.chiKhr.toLocaleString()} ៛</b> (~$${gold.chiUsd.toFixed(2)})
 • Spot Gold: <b>$${gold.spotOzUsd.toFixed(2)}/oz</b>
 
-💵 <b>អត្រាប្ដូរប្រាក់:</b>
-• USD/KHR: <b>${currencies.usdKhrMarket.sell.toLocaleString()} ៛</b>
-• CNY/KHR: <b>${currencies.cnyKhr.rate.toFixed(2)} ៛</b>
+💵 <b>អត្រាប្ដូរប្រាក់ (ACLEDA Mobile):</b>
+• USD/KHR (App): <b>${(currencies.acleda.sellAccount || 4067).toLocaleString()} ៛</b> (ទិញ ${(currencies.acleda.buyAccount || 4055).toLocaleString()}៛)
+• USD/KHR (Cash): <b>${(currencies.acleda.sellCash || 4069).toLocaleString()} ៛</b> (ទិញ ${(currencies.acleda.buyCash || 4053).toLocaleString()}៛)
+• VND/KHR: <b>${currencies.vndKhr?.perVndSell || 0.1570} ៛</b> (១០k ដុង = ${currencies.vndKhr?.sellCash || 1570}៛)
+• CNY/KHR: <b>${currencies.cnyKhr.rate.toFixed(1)} ៛</b>
 
-⛽ <b>តម្លៃប្រេង:</b>
+⛽ <b>តម្លៃប្រេង (ក្រសួងពាណិជ្ជកម្ម ចុះ ៥០៛):</b>
 • សាំងធម្មតា: <b>${fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛/L</b>
 • ម៉ាស៊ូត: <b>${fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛/L</b>
-• Brent Crude: <b>$${fuel.brentCrudeUsd.toFixed(2)}/bbl</b>
+• Singapore MOPS 92: <b>$73.0160/bbl</b> · Brent: <b>$${fuel.brentCrudeUsd.toFixed(2)}/bbl</b>
 
 🎯 <b>ICT Signal:</b> ${ict.biasKhmer} (${ict.tradeSignal.actionKhmer})`;
 
@@ -289,22 +348,36 @@ export default function HomePage() {
             <span className="text-slate-700">|</span>
 
             <span className="flex items-center gap-1">
-              <span>USD/KHR:</span>
-              <span className="text-emerald-400 font-semibold">{currencies.usdKhrMarket.sell.toLocaleString()} ៛</span>
+              <span>USD Cash:</span>
+              <span className="text-emerald-400 font-semibold">{currencies.acleda.sellCash.toLocaleString()} ៛</span>
             </span>
 
             <span className="text-slate-700">|</span>
 
             <span className="flex items-center gap-1">
-              <span>CNY/KHR:</span>
-              <span className="text-sky-400 font-semibold">{currencies.cnyKhr.rate.toFixed(1)} ៛</span>
+              <span>USD App:</span>
+              <span className="text-sky-400 font-semibold">{currencies.acleda.sellAccount.toLocaleString()} ៛</span>
+            </span>
+
+            <span className="text-slate-700">|</span>
+
+            <span className="flex items-center gap-1">
+              <span>VND:</span>
+              <span className="text-amber-300 font-semibold">{currencies.vndKhr?.perVndSell || 0.1570} ៛</span>
             </span>
 
             <span className="text-slate-700">|</span>
 
             <span className="flex items-center gap-1">
               <span>សាំងធម្មតា:</span>
-              <span className="text-slate-200">{fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛</span>
+              <span className="text-emerald-400 font-semibold">{fuel.cambodiaRetail.gasolineRegularKhr.toLocaleString()} ៛</span>
+            </span>
+
+            <span className="text-slate-700">|</span>
+
+            <span className="flex items-center gap-1">
+              <span>ម៉ាស៊ូត:</span>
+              <span className="text-sky-300 font-semibold">{fuel.cambodiaRetail.dieselKhr.toLocaleString()} ៛</span>
             </span>
 
             <span className="text-slate-700">|</span>
@@ -344,6 +417,9 @@ export default function HomePage() {
           <GoldTab
             gold={gold}
             currencies={currencies}
+            isLiveLoading={isRefreshing}
+            liveError={liveError}
+            onRefreshLive={handleRefreshData}
             onSendTelegram={(msg) => {
               setModalDefaultMsg(msg);
               setIsTelegramModalOpen(true);
@@ -358,6 +434,7 @@ export default function HomePage() {
               setModalDefaultMsg(msg);
               setIsTelegramModalOpen(true);
             }}
+            onUpdateCurrencies={setCurrencies}
           />
         )}
 
@@ -368,6 +445,7 @@ export default function HomePage() {
               setModalDefaultMsg(msg);
               setIsTelegramModalOpen(true);
             }}
+            onUpdateFuel={setFuel}
           />
         )}
 
